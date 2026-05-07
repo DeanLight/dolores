@@ -1,0 +1,68 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+packages = ["dolores", "baselines", "benchmarks"]
+py-modules = ["config", "core", "prompts", "vllm_utils"]
+
+[project]
+name = "dolores"
+version = "0.1.0"
+description = "Dolores publication evaluation code, benchmarks, and DeepReasoner experiment harness"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Michael Theologitis", email = "michael.theologitis@outlook.com" }]
+dependencies = [
+    "beautifulsoup4>=4.12.3",
+    "cyclopts>=2.0.0",
+    "datasets>=4.8.4",
+    "google-search-results>=2.4.2",
+    "litellm>=1.83.0",
+    "markdownify>=0.13.1",
+    "matplotlib>=3.10.8",
+    "numpy>=1.25,<2.4",
+    "openai>=1.52.2",
+    "pandas>=2.2.3",
+    "pillow>=11.0.0",
+    "pydantic>=2.12.5",
+    "pydantic-settings>=2.13.1",
+    "python-dateutil>=2.9.0.post0",
+    "python-dotenv>=1.2.2",
+    "pyyaml>=6.0.3",
+    "requests>=2.32.3",
+    "scikit-learn>=1.8.0",
+    "scipy>=1.17.1",
+    "structlog>=23.0.0",
+    "tqdm>=4.66.4",
+    "vllm",
+    "deep-reasoner[vllm]",
+]
+
+[tool.uv.workspace]
+members = ["deep-reasoner"]
+
+[tool.uv.sources]
+deep-reasoner = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "juplit>=0.0.6",
+    "ipykernel>=6.0",
+    "pytest>=8.0",
+    "transformers>=4.40.0",
+]
+
+[tool.juplit]
+notebook_src_dirs = ["src", "analysis"]
+
+[tool.jupytext]
+formats = "ipynb,py:percent"
+
+[tool.pytest.ini_options]
+testpaths = ["src"]
+python_files = ["*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]

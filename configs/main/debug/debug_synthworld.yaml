@@ -1,0 +1,18 @@
+# SynthWorld debug — remote API, 2 tasks
+log_dir: logs/synthworld_debug
+
+_compose:
+  - configs/experiment_base/inference_remote_api.yaml
+  - configs/experiment_base/benchmark_synthworld.yaml
+
+batch_size: 2
+task_timeout: 300
+
+benchmark:
+  key_limit: 2
+
+agent:
+  configs:
+    - model-configs/debug.yaml
+    - configs/agents/synthworld.yaml
+  version: synthworld_0.0.1

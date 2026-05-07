@@ -1,0 +1,6 @@
+vllm:
+  extra_args: ["--enable-prefix-caching", "--seed", "42", "--reasoning-parser", "qwen3",
+   "--tool-call-parser", "hermes", "--enable-auto-tool-choice"]
+agent:
+  extra_params:
+    search_model_id: hosted_vllm/Qwen/Qwen3-32B

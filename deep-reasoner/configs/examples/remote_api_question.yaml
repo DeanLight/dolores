@@ -1,0 +1,13 @@
+# Example: remote OpenAI-compatible API (set OPENAI_API_KEY and OPENAI_BASE_URL as needed).
+_compose:
+  - _debug_agent_body.yaml
+
+client:
+  base_url: "https://api.example.com/v1"
+  api_key_env: OPENAI_API_KEY
+
+model: "Qwen/Qwen3-32B"
+
+benchmark: "example"
+task_id: "remote-api"
+log_dir: "logs"

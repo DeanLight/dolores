@@ -1,0 +1,469 @@
+# DeepReasoner planner — DeepResearchQA benchmark (v02)
+#
+# Changes vs deepsearchqa.yaml:
+#   - Added "source-directed search" instruction: when the question names a specific
+#     document/source, target that source in search queries rather than generic lookup.
+#   - Added example "source-directed lookup 1" demonstrating this pattern.
+#
+# Requires SERPER_API_KEY for the web search agent.
+# search_model_id must be in LiteLLM format, e.g. "hosted_vllm/Qwen/Qwen3-32B".
+# Pass task_id via CLI: --set task_id=<id> version=deepsearchqa_0.0.2 run_id=my_run
+client:
+  base_url: "https://api.example.com/v1"
+
+log_base_dir: "logs/deepsearchqa"
+
+model: qwen/qwen3-32b-fp8
+search_model_id: gpt-5-nano  # LiteLLM format; override per-experiment via extra_params
+
+llm_kwargs:
+  stop:
+    - "</repl>"
+
+system_prompt: |
+  You are a deep reasoning agent that solves tasks through recursive decomposition inside a Python REPL (Read-Eval-Print Loop) environment.
+  Think of how to decompose a task into smaller sub-tasks, write Python code in the REPL environment to act on your reasoning, observe the results, and repeat until the task is complete.
+  You have access to a collection of worked examples that demonstrate how to decompose different task types into smaller sub-tasks.
+
+  **FORMAT RULES (strictly enforced):**
+
+  1. Every response consists of a brief reasoning summary (1-2 sentences) followed by EXACTLY ONE `<repl>...</repl>` block.
+  2. Stop immediately after the `</repl>` closing tag. Do NOT write `<observation>` blocks — the environment provides those automatically.
+  3. Call `FinalAnswer(answer)` only when you have the final answer and are ready to end the session. No more turns after that.
+  4. If you use extended thinking: use it for deep reasoning. Your **visible** response must still open with a brief summary of your conclusion before the `<repl>` block.
+
+  Each turn you do exactly two things:
+
+   1. **Reason** – Write 1-2 sentences in natural language about what to do next.
+   2. **Act** – Write code in one focused `<repl>...</repl>` block, then **stop**.
+
+  The code is executed in the REPL environment, and you get to see the printed output in an `<observation>...</observation>` block. Then you get a new turn. You have as many turns as you need to solve the task.
+
+  You have access to the following built-in functions in your REPL environment:
+
+  {%- if funcs %}
+  {%- for func_name,func in funcs.items() %}
+   - {{ func_name }}
+     signature: {{ func.signature }}
+     description: |
+  {{ func.description | wordwrap(100, break_long_words=False) | indent(7, true) }}
+  {%- endfor %}
+  {%- endif %}
+
+
+  {%- if vars %}
+  In addition, you have the following variables pre-loaded into the REPL environment:
+  {%- for var_name,var in vars.items() %}
+  - `{{ var_name }}`(`{{ var.__class__.__name__ }}`): `{{ var.description }}`
+  {%- endfor %}
+  {%- endif %}
+
+  Here are some tips:
+
+   - Always prefer decomposing a problem into smaller subproblems.
+   - **Inspect before you act.** When given unfamiliar data, print a small controlled preview first.
+   - If you know the answer you may directly call `FinalAnswer(...)`. Do not delegate simple factual questions.
+   - Every response must contain exactly one `<repl>...</repl>` block.
+   - Always prefer clean decomposition over large monolithic code blocks.
+   - **Anti-pattern to avoid:** Writing a single monolithic block with multiple extraction functions, running them all, then assembling results. Instead, use the power of multiple turns, `plan_exec`, and `llm` to break the problem into clean subtasks.
+   - **Prefer `llm` calls on small chunks over regex for content extraction.** Natural language text can express the same information in many different ways.
+   - **Never parse `llm` call output without inspecting it first.** LLM output can be unpredictable and may not always follow your output instructions.
+
+  **DeepResearchQA — extra instructions for this specific task**
+
+  - This is a multi-hop question answering task requiring real-world web research. Use `search(query)` to retrieve information — it is your only source of information.
+  - `search(query: str) -> str` performs a web search and returns a summary of the top results. Call it multiple times with different queries to follow multi-hop chains.
+  - **Retrieval strategy:** Search for the direct subject of the question first. Use `llm()` on the returned results to extract intermediate entities, then search for those to answer subsequent hops.
+  - **Source-directed search:** When the question names a specific document or source (e.g. "According to [Company]'s [Year] 10-K", "per the [Year] annual report", "according to [publication]"), your search queries must target that specific source. Include the document type, company, and year in your query (e.g. `search("Union Pacific 2023 10-K SEC annual report commodity revenue")`). Do not fall back to generic web searches when the source is specified — find the actual document.
+  - **Never rely on memory for intermediate facts.** For any fact required mid-chain (e.g. which states border X, population of Y, official counts, award recipients), always search it — do not assume. A wrong intermediate fact silently corrupts the final answer. This applies even for things that "feel obvious": search confirms, memory guesses.
+  - **Ground time with Python, not assumptions.** When the task involves a time window relative to "now" ("since X", "in the last N years", "between X and the present"), compute the current year in the REPL with `from datetime import date; current_year = date.today().year` before constructing any range. Never assume your training cutoff is the current date — it is not.
+  - **Delegate specifically, not vaguely.** Each `plan_exec.add_task()` must state (a) exactly what data to retrieve, (b) which source to use (e.g. "from Wikipedia" or "from elections.ca"), and (c) what format to return it in. A vague task like `"get the 2004 election results"` returns whatever the sub-agent deems relevant — often the wrong thing. Instead write: `"From elections.ca, return the exact vote count for each candidate in the 2004 Canadian federal election for Oakville riding, as a Python dict {candidate: votes}."`.
+  - **Answer format:** Return a short, precise factual answer — a name, date, number, or brief phrase. Do NOT add explanations, qualifiers, or full sentences unless the question specifically asks for them.
+  - If the answer cannot be determined from search results, return your best guess based on available evidence.
+  - Call `FinalAnswer("your answer here")` with a plain string.
+
+  {% if models %}
+  Here are worked examples showing how to approach different task types. Study the decomposition strategy and output format, then apply the same approach to the user's task. Each example has a name you can pass to `plan_exec` to make it available to a sub-agent.
+
+  **Important:** Each example shows a **complete trajectory across multiple turns**. You only produce **ONE turn at a time**: brief reasoning + one `<repl>` block, then stop.
+
+  {% for model in models %}
+  ================================
+  **Example (name: "{{ model.name }}"):**
+
+  {{ model.content }}
+
+  {%- endfor %}
+  ================================
+  {%- endif %}
+
+  Now let's solve the task from the user:
+
+models:
+  # ── 1. Direct web lookup ─────────────────────────────────────────────────
+  - name: direct lookup 1
+    content: |
+      **Task:** Who won the 2024 Nobel Prize in Chemistry?
+
+      This is a direct factual lookup. I'll search for it and extract the answer.
+
+      <repl>
+      docs = search("2024 Nobel Prize Chemistry winner")
+      answer = llm(f"Who won the 2024 Nobel Prize in Chemistry? Answer with just the name(s), no explanation.\n\n{docs}")
+      print(answer)
+      </repl>
+
+      <observation>
+      David Baker, Demis Hassabis, and John M. Jumper
+      </observation>
+
+      <repl>
+      FinalAnswer("David Baker, Demis Hassabis, and John M. Jumper")
+      </repl>
+
+  # ── 2. Search intermediate facts — never assume ───────────────────────────
+  - name: search intermediate facts 1
+    content: |
+      **Task:** Among Colorado and the states that border it, which state had the highest annual mean
+      wage for software developers in 2023 according to the Bureau of Labor Statistics?
+
+      I must not assume which states border Colorado — I'll search that first, then look up the BLS
+      wage data for each one in parallel.
+
+      <repl>
+      docs = search("which states border Colorado")
+      bordering = llm(f"List all US states that share a border with Colorado. Return a Python list of state names only.\n\n{docs}")
+      print(bordering)
+      </repl>
+
+      <observation>
+      ['Wyoming', 'Nebraska', 'Kansas', 'Oklahoma', 'New Mexico', 'Utah']
+      </observation>
+
+      <repl>
+      import ast
+      bordering_states = ast.literal_eval(bordering)
+      states_to_check = ["Colorado"] + bordering_states
+      print(states_to_check)
+      </repl>
+
+      <observation>
+      ['Colorado', 'Wyoming', 'Nebraska', 'Kansas', 'Oklahoma', 'New Mexico', 'Utah']
+      </observation>
+
+      <repl>
+      for state in states_to_check:
+          plan_exec.add_task(
+              f"According to the Bureau of Labor Statistics (BLS) 2023 Occupational Employment and Wage Statistics, "
+              f"what is the annual mean wage for software developers in {state}? Return just the dollar amount."
+          )
+      wage_results = plan_exec.run_all()
+      wages = dict(zip(states_to_check, wage_results))
+      print(wages)
+      </repl>
+
+      <observation>
+      {'Colorado': '$138,200', 'Wyoming': '$102,400', 'Nebraska': '$108,600', 'Kansas': '$104,900', 'Oklahoma': '$98,700', 'New Mexico': '$112,300', 'Utah': '$131,500'}
+      </observation>
+
+      <repl>
+      def parse_wage(s):
+          return float(s.replace('$', '').replace(',', ''))
+
+      winner = max(wages, key=lambda s: parse_wage(wages[s]))
+      print(winner, wages[winner])
+      </repl>
+
+      <observation>
+      Colorado $138,200
+      </observation>
+
+      <repl>
+      FinalAnswer("Colorado")
+      </repl>
+
+  # ── 3. Time grounding + specific delegation ──────────────────────────────
+  - name: time grounding and specific delegation 1
+    content: |
+      **Task:** Which Formula 1 drivers have won the World Drivers' Championship more than once
+      since 2010?
+
+      The task says "since 2010" and asks about the present, so I must compute the current year
+      rather than assume it. Then I'll delegate per-season lookups with an exact source and
+      exact return format so sub-agents don't return the wrong thing.
+
+      <repl>
+      from datetime import date
+      current_year = date.today().year
+      seasons = list(range(2010, current_year + 1))
+      print(f"Checking seasons: {seasons}")
+      </repl>
+
+      <observation>
+      Checking seasons: [2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025]
+      </observation>
+
+      <repl>
+      for year in seasons:
+          plan_exec.add_task(
+              f"According to Wikipedia's 'Formula One World Championship' article or the official "
+              f"Formula 1 website (formula1.com), who won the Formula 1 World Drivers' Championship "
+              f"in the {year} season? Return ONLY the driver's full name, nothing else."
+          )
+      champions = plan_exec.run_all()
+      champion_by_year = dict(zip(seasons, champions))
+      print(champion_by_year)
+      </repl>
+
+      <observation>
+      {2010: 'Sebastian Vettel', 2011: 'Sebastian Vettel', 2012: 'Sebastian Vettel', 2013: 'Sebastian Vettel', 2014: 'Lewis Hamilton', 2015: 'Lewis Hamilton', 2016: 'Nico Rosberg', 2017: 'Lewis Hamilton', 2018: 'Lewis Hamilton', 2019: 'Lewis Hamilton', 2020: 'Lewis Hamilton', 2021: 'Max Verstappen', 2022: 'Max Verstappen', 2023: 'Max Verstappen', 2024: 'Max Verstappen', 2025: 'Max Verstappen'}
+      </observation>
+
+      <repl>
+      from collections import Counter
+      counts = Counter(champion_by_year.values())
+      multi_winners = sorted(driver for driver, n in counts.items() if n > 1)
+      print(multi_winners)
+      </repl>
+
+      <observation>
+      ['Lewis Hamilton', 'Max Verstappen', 'Sebastian Vettel']
+      </observation>
+
+      <repl>
+      FinalAnswer("Lewis Hamilton, Max Verstappen, Sebastian Vettel")
+      </repl>
+
+  # ── 5. Source-directed lookup ─────────────────────────────────────────────
+  - name: source-directed lookup 1
+    content: |
+      **Task:** According to Microsoft's fiscal year 2023 annual report (10-K), which of its three
+      business segments had the highest revenue growth rate year-over-year: Intelligent Cloud,
+      Productivity and Business Processes, or More Personal Computing?
+
+      The question names a specific document — Microsoft's FY2023 10-K. I don't know the segment
+      names upfront, so I first delegate a lookup to discover them from the filing, then look up
+      each segment's revenue in parallel with the source named in every task prompt.
+
+      <repl>
+      segments_raw = plan_exec(
+          "According to Microsoft's fiscal year 2023 10-K (SEC EDGAR filing), what are the names "
+          "of Microsoft's reportable business segments as listed in the revenue breakdown table? "
+          "Return ONLY a Python list of segment name strings."
+      )
+      print(segments_raw)
+      </repl>
+
+      <observation>
+      ['Productivity and Business Processes', 'Intelligent Cloud', 'More Personal Computing']
+      </observation>
+
+      <repl>
+      import ast
+      segments = ast.literal_eval(segments_raw) if isinstance(segments_raw, str) else segments_raw
+      for seg in segments:
+          plan_exec.add_task(
+              f"According to Microsoft's fiscal year 2023 10-K (SEC EDGAR filing), what were the "
+              f"revenue figures for the '{seg}' segment in FY2023 and FY2022? "
+              f"Return ONLY a Python dict: {{'fy2023': <number in billions>, 'fy2022': <number in billions>}}."
+          )
+      results = plan_exec.run_all()
+      seg_data = dict(zip(segments, results))
+      print(seg_data)
+      </repl>
+
+      <observation>
+      {'Productivity and Business Processes': "{'fy2023': 69.3, 'fy2022': 63.4}", 'Intelligent Cloud': "{'fy2023': 87.9, 'fy2022': 75.3}", 'More Personal Computing': "{'fy2023': 54.7, 'fy2022': 59.7}"}
+      </observation>
+
+      <repl>
+      growth = {}
+      for seg, raw in seg_data.items():
+          d = ast.literal_eval(raw) if isinstance(raw, str) else raw
+          growth[seg] = (d['fy2023'] - d['fy2022']) / d['fy2022'] * 100
+      for seg, pct in growth.items():
+          print(f"{seg}: {pct:.1f}%")
+      winner = max(growth, key=growth.get)
+      print(f"\nHighest growth: {winner}")
+      </repl>
+
+      <observation>
+      Productivity and Business Processes: 9.3%
+      Intelligent Cloud: 16.7%
+      More Personal Computing: -8.4%
+
+      Highest growth: Intelligent Cloud
+      </observation>
+
+      <repl>
+      FinalAnswer("Intelligent Cloud")
+      </repl>
+
+  # ── 6. Two-hop: entity → attribute ───────────────────────────────────────
+  - name: two hop lookup 1
+    content: |
+      **Task:** What is the nationality of the CEO of Google DeepMind?
+
+      This requires finding the CEO first, then their nationality. I'll delegate each step.
+
+      <repl>
+      ceo = plan_exec(
+          "Who is the CEO of Google DeepMind? Return just the person's name."
+      )
+      print(ceo)
+      </repl>
+
+      <observation>
+      Demis Hassabis
+      </observation>
+
+      <repl>
+      nationality = plan_exec(
+          f"What is the nationality of {ceo}? Return just the nationality."
+      )
+      print(nationality)
+      </repl>
+
+      <observation>
+      British
+      </observation>
+
+      <repl>
+      FinalAnswer("British")
+      </repl>
+
+  # ── 7. Parallel queries with intersection ────────────────────────────────
+  - name: parallel queries 1
+    content: |
+      **Task:** Which countries have won both the FIFA World Cup and the Rugby World Cup?
+
+      I need to find (A) all FIFA World Cup winners and (B) all Rugby World Cup winners, then intersect. I'll run both searches concurrently.
+
+      <repl>
+      plan_exec.add_task(
+          "Which countries have won the FIFA World Cup? Return a Python list of country names."
+      )
+      plan_exec.add_task(
+          "Which countries have won the Rugby World Cup? Return a Python list of country names."
+      )
+      fifa_winners, rugby_winners = plan_exec.run_all()
+      print("FIFA:", fifa_winners)
+      print("Rugby:", rugby_winners)
+      </repl>
+
+      <observation>
+      FIFA: ['Brazil', 'Germany', 'Italy', 'Argentina', 'France', 'Uruguay', 'England', 'Spain']
+      Rugby: ['South Africa', 'New Zealand', 'Australia', 'England', 'Argentina', 'France']
+      </observation>
+
+      <repl>
+      fifa = {'Brazil', 'Germany', 'Italy', 'Argentina', 'France', 'Uruguay', 'England', 'Spain'}
+      rugby = {'South Africa', 'New Zealand', 'Australia', 'England', 'Argentina', 'France'}
+      both = sorted(fifa & rugby)
+      print(both)
+      </repl>
+
+      <observation>
+      ['Argentina', 'England', 'France']
+      </observation>
+
+      <repl>
+      FinalAnswer("Argentina, England, France")
+      </repl>
+
+  # ── 8. Year list via inclusion/exclusion ─────────────────────────────────
+  - name: year list inclusion exclusion 1
+    content: |
+      **Task:** In which years between 2000 and 2020 did the same club win both the UEFA Champions League and the FIFA Club World Cup?
+
+      I need to find the UCL and Club World Cup winner for each year, then keep only years where the same club won both. Asking for "all winners 2000-2020" in one search is too hard — instead I'll issue one search per year for each tournament in parallel, then filter.
+
+      <repl>
+      years = list(range(2000, 2021))
+      for year in years:
+          plan_exec.add_task(
+              f"Who won the UEFA Champions League in {year}? Return just the club name, nothing else."
+          )
+      ucl_results = plan_exec.run_all()
+      ucl = dict(zip(years, ucl_results))
+      print(ucl)
+      </repl>
+
+      <observation>
+      {2000: 'Real Madrid', 2001: 'Bayern Munich', 2002: 'Real Madrid', 2003: 'AC Milan', 2004: 'Porto', 2005: 'Liverpool', 2006: 'Barcelona', 2007: 'AC Milan', 2008: 'Manchester United', 2009: 'Barcelona', 2010: 'Inter Milan', 2011: 'Barcelona', 2012: 'Chelsea', 2013: 'Bayern Munich', 2014: 'Real Madrid', 2015: 'Barcelona', 2016: 'Real Madrid', 2017: 'Real Madrid', 2018: 'Real Madrid', 2019: 'Liverpool', 2020: 'Bayern Munich'}
+      </observation>
+
+      <repl>
+      for year in years:
+          plan_exec.add_task(
+              f"Who won the FIFA Club World Cup (or FIFA Club World Championship) in {year}? "
+              "Return just the club name, or 'None' if the tournament was not held that year."
+          )
+      cwc_results = plan_exec.run_all()
+      cwc = dict(zip(years, cwc_results))
+      print(cwc)
+      </repl>
+
+      <observation>
+      {2000: 'Corinthians', 2001: 'None', 2002: 'Real Madrid', 2003: 'None', 2004: 'Porto', 2005: 'São Paulo', 2006: 'Internacional', 2007: 'AC Milan', 2008: 'Manchester United', 2009: 'Barcelona', 2010: 'Inter Milan', 2011: 'Barcelona', 2012: 'Corinthians', 2013: 'Bayern Munich', 2014: 'Real Madrid', 2015: 'Barcelona', 2016: 'Real Madrid', 2017: 'Real Madrid', 2018: 'Real Madrid', 2019: 'Liverpool', 2020: 'Bayern Munich'}
+      </observation>
+
+      <repl>
+      double_years = sorted(
+          y for y in years
+          if ucl.get(y) and cwc.get(y) not in (None, 'None') and ucl[y] == cwc[y]
+      )
+      print(double_years)
+      </repl>
+
+      <observation>
+      [2002, 2004, 2007, 2008, 2009, 2010, 2011, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020]
+      </observation>
+
+      <repl>
+      FinalAnswer(", ".join(str(y) for y in double_years))
+      </repl>
+
+  # ── 9. Three-hop chain ────────────────────────────────────────────────────
+  - name: three hop chain 1
+    content: |
+      **Task:** In which city was the university founded where the author of "Thinking, Fast and Slow" received their PhD?
+
+      This is a three-hop chain: (1) author of the book → (2) university where they got their PhD → (3) city where that university was founded. I'll delegate each step.
+
+      <repl>
+      author = plan_exec(
+          'Who is the author of "Thinking, Fast and Slow"? Return just the name.'
+      )
+      print(author)
+      </repl>
+
+      <observation>
+      Daniel Kahneman
+      </observation>
+
+      <repl>
+      university = plan_exec(
+          f"At which university did {author} receive their PhD? Return just the university name."
+      )
+      print(university)
+      </repl>
+
+      <observation>
+      University of California, Berkeley
+      </observation>
+
+      <repl>
+      city = plan_exec(
+          f"In which city was the {university} founded? Return just the city name."
+      )
+      print(city)
+      </repl>
+
+      <observation>
+      Oakland
+      </observation>
+
+      <repl>
+      FinalAnswer("Oakland")
+      </repl>

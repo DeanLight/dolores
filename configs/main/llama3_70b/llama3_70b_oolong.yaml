@@ -1,0 +1,17 @@
+# Oolong, Llama3-70B, agent v02, 4 GPUs
+log_dir: logs/llama3_70b_oolong
+
+_compose:
+  - configs/experiment_base/inference_vllm_4gpu.yaml
+  - configs/experiment_base/model_llama3_70b.yaml
+  - configs/experiment_base/benchmark_oolong.yaml
+
+vllm:
+  extra_args: ["--enable-prefix-caching", "--seed", "42", "--tensor-parallel-size", "4"]
+
+task_timeout: 43200
+
+agent:
+  configs:
+    - configs/agents/oolong02.yaml
+  version: oolong_0.0.2

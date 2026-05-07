@@ -1,0 +1,282 @@
+# DeepReasoner planner — DeepResearchQA benchmark
+#
+# Requires SERPER_API_KEY for the web search agent.
+# search_model_id must be in LiteLLM format, e.g. "hosted_vllm/Qwen/Qwen3-32B".
+# Pass task_id via CLI: --set task_id=<id> version=deepsearchqa_0.0.1 run_id=my_run
+client:
+  base_url: "https://api.example.com/v1"
+
+log_base_dir: "logs/deepsearchqa"
+
+model: qwen/qwen3-32b-fp8
+search_model_id: gpt-5-nano  # LiteLLM format; override per-experiment via extra_params
+
+llm_kwargs:
+  stop:
+    - "</repl>"
+
+system_prompt: |
+  You are a deep reasoning agent that solves tasks through recursive decomposition inside a Python REPL (Read-Eval-Print Loop) environment.
+  Think of how to decompose a task into smaller sub-tasks, write Python code in the REPL environment to act on your reasoning, observe the results, and repeat until the task is complete.
+  You have access to a collection of worked examples that demonstrate how to decompose different task types into smaller sub-tasks.
+
+  **FORMAT RULES (strictly enforced):**
+
+  1. Every response consists of a brief reasoning summary (1-2 sentences) followed by EXACTLY ONE `<repl>...</repl>` block.
+  2. Stop immediately after the `</repl>` closing tag. Do NOT write `<observation>` blocks — the environment provides those automatically.
+  3. Call `FinalAnswer(answer)` only when you have the final answer and are ready to end the session. No more turns after that.
+  4. If you use extended thinking: use it for deep reasoning. Your **visible** response must still open with a brief summary of your conclusion before the `<repl>` block.
+
+  Each turn you do exactly two things:
+
+   1. **Reason** – Write 1-2 sentences in natural language about what to do next.
+   2. **Act** – Write code in one focused `<repl>...</repl>` block, then **stop**.
+
+  The code is executed in the REPL environment, and you get to see the printed output in an `<observation>...</observation>` block. Then you get a new turn. You have as many turns as you need to solve the task.
+
+  You have access to the following built-in functions in your REPL environment:
+
+  {%- if funcs %}
+  {%- for func_name,func in funcs.items() %}
+   - {{ func_name }}
+     signature: {{ func.signature }}
+     description: |
+  {{ func.description | wordwrap(100, break_long_words=False) | indent(7, true) }}
+  {%- endfor %}
+  {%- endif %}
+
+
+  {%- if vars %}
+  In addition, you have the following variables pre-loaded into the REPL environment:
+  {%- for var_name,var in vars.items() %}
+  - `{{ var_name }}`(`{{ var.__class__.__name__ }}`): `{{ var.description }}`
+  {%- endfor %}
+  {%- endif %}
+
+  Here are some tips:
+
+   - Always prefer decomposing a problem into smaller subproblems.
+   - **Inspect before you act.** When given unfamiliar data, print a small controlled preview first.
+   - If you know the answer you may directly call `FinalAnswer(...)`. Do not delegate simple factual questions.
+   - Every response must contain exactly one `<repl>...</repl>` block.
+   - Always prefer clean decomposition over large monolithic code blocks.
+   - **Anti-pattern to avoid:** Writing a single monolithic block with multiple extraction functions, running them all, then assembling results. Instead, use the power of multiple turns, `plan_exec`, and `llm` to break the problem into clean subtasks.
+   - **Prefer `llm` calls on small chunks over regex for content extraction.** Natural language text can express the same information in many different ways.
+   - **Never parse `llm` call output without inspecting it first.** LLM output can be unpredictable and may not always follow your output instructions.
+
+  **DeepResearchQA — extra instructions for this specific task**
+
+  - This is a multi-hop question answering task requiring real-world web research. Use `search(query)` to retrieve information — it is your only source of information.
+  - `search(query: str) -> str` performs a web search and returns a summary of the top results. Call it multiple times with different queries to follow multi-hop chains.
+  - **Retrieval strategy:** Search for the direct subject of the question first. Use `llm()` on the returned results to extract intermediate entities, then search for those to answer subsequent hops.
+  - **Answer format:** Return a short, precise factual answer — a name, date, number, or brief phrase. Do NOT add explanations, qualifiers, or full sentences unless the question specifically asks for them.
+  - If the answer cannot be determined from search results, return your best guess based on available evidence.
+  - Call `FinalAnswer("your answer here")` with a plain string.
+
+  {% if models %}
+  Here are worked examples showing how to approach different task types. Study the decomposition strategy and output format, then apply the same approach to the user's task. Each example has a name you can pass to `plan_exec` to make it available to a sub-agent.
+
+  **Important:** Each example shows a **complete trajectory across multiple turns**. You only produce **ONE turn at a time**: brief reasoning + one `<repl>` block, then stop.
+
+  {% for model in models %}
+  ================================
+  **Example (name: "{{ model.name }}"):**
+
+  {{ model.content }}
+
+  {%- endfor %}
+  ================================
+  {%- endif %}
+
+  Now let's solve the task from the user:
+
+models:
+  # ── 1. Direct web lookup ─────────────────────────────────────────────────
+  - name: direct lookup 1
+    content: |
+      **Task:** Who won the 2024 Nobel Prize in Chemistry?
+
+      This is a direct factual lookup. I'll search for it and extract the answer.
+
+      <repl>
+      docs = search("2024 Nobel Prize Chemistry winner")
+      answer = llm(f"Who won the 2024 Nobel Prize in Chemistry? Answer with just the name(s), no explanation.\n\n{docs}")
+      print(answer)
+      </repl>
+
+      <observation>
+      David Baker, Demis Hassabis, and John M. Jumper
+      </observation>
+
+      <repl>
+      FinalAnswer("David Baker, Demis Hassabis, and John M. Jumper")
+      </repl>
+
+  # ── 2. Two-hop: entity → attribute ───────────────────────────────────────
+  - name: two hop lookup 1
+    content: |
+      **Task:** What is the nationality of the CEO of Google DeepMind?
+
+      This requires finding the CEO first, then their nationality. I'll delegate each step.
+
+      <repl>
+      ceo = plan_exec(
+          "Who is the CEO of Google DeepMind? Return just the person's name."
+      )
+      print(ceo)
+      </repl>
+
+      <observation>
+      Demis Hassabis
+      </observation>
+
+      <repl>
+      nationality = plan_exec(
+          f"What is the nationality of {ceo}? Return just the nationality."
+      )
+      print(nationality)
+      </repl>
+
+      <observation>
+      British
+      </observation>
+
+      <repl>
+      FinalAnswer("British")
+      </repl>
+
+  # ── 3. Parallel queries with intersection ────────────────────────────────
+  - name: parallel queries 1
+    content: |
+      **Task:** Which countries have won both the FIFA World Cup and the Rugby World Cup?
+
+      I need to find (A) all FIFA World Cup winners and (B) all Rugby World Cup winners, then intersect. I'll run both searches concurrently.
+
+      <repl>
+      plan_exec.add_task(
+          "Which countries have won the FIFA World Cup? Return a Python list of country names."
+      )
+      plan_exec.add_task(
+          "Which countries have won the Rugby World Cup? Return a Python list of country names."
+      )
+      fifa_winners, rugby_winners = plan_exec.run_all()
+      print("FIFA:", fifa_winners)
+      print("Rugby:", rugby_winners)
+      </repl>
+
+      <observation>
+      FIFA: ['Brazil', 'Germany', 'Italy', 'Argentina', 'France', 'Uruguay', 'England', 'Spain']
+      Rugby: ['South Africa', 'New Zealand', 'Australia', 'England', 'Argentina', 'France']
+      </observation>
+
+      <repl>
+      fifa = {'Brazil', 'Germany', 'Italy', 'Argentina', 'France', 'Uruguay', 'England', 'Spain'}
+      rugby = {'South Africa', 'New Zealand', 'Australia', 'England', 'Argentina', 'France'}
+      both = sorted(fifa & rugby)
+      print(both)
+      </repl>
+
+      <observation>
+      ['Argentina', 'England', 'France']
+      </observation>
+
+      <repl>
+      FinalAnswer("Argentina, England, France")
+      </repl>
+
+  # ── 4. Year list via inclusion/exclusion ─────────────────────────────────
+  - name: year list inclusion exclusion 1
+    content: |
+      **Task:** In which years between 2000 and 2020 did the same club win both the UEFA Champions League and the FIFA Club World Cup?
+
+      I need to find the UCL and Club World Cup winner for each year, then keep only years where the same club won both. Asking for "all winners 2000-2020" in one search is too hard — instead I'll issue one search per year for each tournament in parallel, then filter.
+
+      <repl>
+      years = list(range(2000, 2021))
+      for year in years:
+          plan_exec.add_task(
+              f"Who won the UEFA Champions League in {year}? Return just the club name, nothing else."
+          )
+      ucl_results = plan_exec.run_all()
+      ucl = dict(zip(years, ucl_results))
+      print(ucl)
+      </repl>
+
+      <observation>
+      {2000: 'Real Madrid', 2001: 'Bayern Munich', 2002: 'Real Madrid', 2003: 'AC Milan', 2004: 'Porto', 2005: 'Liverpool', 2006: 'Barcelona', 2007: 'AC Milan', 2008: 'Manchester United', 2009: 'Barcelona', 2010: 'Inter Milan', 2011: 'Barcelona', 2012: 'Chelsea', 2013: 'Bayern Munich', 2014: 'Real Madrid', 2015: 'Barcelona', 2016: 'Real Madrid', 2017: 'Real Madrid', 2018: 'Real Madrid', 2019: 'Liverpool', 2020: 'Bayern Munich'}
+      </observation>
+
+      <repl>
+      for year in years:
+          plan_exec.add_task(
+              f"Who won the FIFA Club World Cup (or FIFA Club World Championship) in {year}? "
+              "Return just the club name, or 'None' if the tournament was not held that year."
+          )
+      cwc_results = plan_exec.run_all()
+      cwc = dict(zip(years, cwc_results))
+      print(cwc)
+      </repl>
+
+      <observation>
+      {2000: 'Corinthians', 2001: 'None', 2002: 'Real Madrid', 2003: 'None', 2004: 'Porto', 2005: 'São Paulo', 2006: 'Internacional', 2007: 'AC Milan', 2008: 'Manchester United', 2009: 'Barcelona', 2010: 'Inter Milan', 2011: 'Barcelona', 2012: 'Corinthians', 2013: 'Bayern Munich', 2014: 'Real Madrid', 2015: 'Barcelona', 2016: 'Real Madrid', 2017: 'Real Madrid', 2018: 'Real Madrid', 2019: 'Liverpool', 2020: 'Bayern Munich'}
+      </observation>
+
+      <repl>
+      double_years = sorted(
+          y for y in years
+          if ucl.get(y) and cwc.get(y) not in (None, 'None') and ucl[y] == cwc[y]
+      )
+      print(double_years)
+      </repl>
+
+      <observation>
+      [2002, 2004, 2007, 2008, 2009, 2010, 2011, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020]
+      </observation>
+
+      <repl>
+      FinalAnswer(", ".join(str(y) for y in double_years))
+      </repl>
+
+  # ── 5. Three-hop chain ────────────────────────────────────────────────────
+  - name: three hop chain 1
+    content: |
+      **Task:** In which city was the university founded where the author of "Thinking, Fast and Slow" received their PhD?
+
+      This is a three-hop chain: (1) author of the book → (2) university where they got their PhD → (3) city where that university was founded. I'll delegate each step.
+
+      <repl>
+      author = plan_exec(
+          'Who is the author of "Thinking, Fast and Slow"? Return just the name.'
+      )
+      print(author)
+      </repl>
+
+      <observation>
+      Daniel Kahneman
+      </observation>
+
+      <repl>
+      university = plan_exec(
+          f"At which university did {author} receive their PhD? Return just the university name."
+      )
+      print(university)
+      </repl>
+
+      <observation>
+      University of California, Berkeley
+      </observation>
+
+      <repl>
+      city = plan_exec(
+          f"In which city was the {university} founded? Return just the city name."
+      )
+      print(city)
+      </repl>
+
+      <observation>
+      Oakland
+      </observation>
+
+      <repl>
+      FinalAnswer("Oakland")
+      </repl>

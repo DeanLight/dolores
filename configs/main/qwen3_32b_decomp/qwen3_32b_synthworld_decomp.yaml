@@ -1,0 +1,12 @@
+# SynthWorld, Qwen3-32B, decomposition instructions, 1 GPU
+log_dir: logs/qwen3_32b_synthworld_decomp
+
+_compose:
+  - configs/experiment_base/inference_vllm_1gpu.yaml
+  - configs/experiment_base/model_qwen3_32b.yaml
+  - configs/experiment_base/benchmark_synthworld.yaml
+
+agent:
+  configs:
+    - configs/agents/synthworld_decomp.yaml
+  version: synthworld_decomp_0.0.1

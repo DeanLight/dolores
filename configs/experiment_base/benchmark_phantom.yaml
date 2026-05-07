@@ -1,0 +1,9 @@
+batch_size: 100
+task_timeout: 36000
+resume: true
+benchmark:
+  name: phantomwiki
+  key_limit_seed: 42
+  extra_params:
+    size: 500
+    seed: 1

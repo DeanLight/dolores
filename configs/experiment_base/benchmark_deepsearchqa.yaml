@@ -1,0 +1,6 @@
+batch_size: 80
+task_timeout: 36000
+resume: true
+benchmark:
+  name: deepsearchqa
+  key_limit_seed: 42

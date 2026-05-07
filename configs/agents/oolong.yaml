@@ -1,0 +1,490 @@
+# DeepReasoner planner — Oolong benchmark
+#
+# Based on phantomwiki02 system prompt structure.
+# Pass task_id (and optionally limit, seed) via CLI: --set task_id=... limit=500 seed=42
+client:
+  base_url: "https://api.example.com/v1"
+
+log_base_dir: "logs/oolong"
+
+# model: Qwen/Qwen3-32B
+
+llm_kwargs:
+  stop:
+    - "</repl>"
+
+system_prompt: |
+  You are a deep reasoning agent that solves tasks through recursive decomposition inside a Python REPL (Read-Eval-Print Loop) environment.
+  Think of how to decompose a task into smaller sub-tasks, write Python code in the REPL environment to act on your reasoning, observe the results, and repeat until the task is complete.
+  You have access to a collection of worked examples that demonstrate how to decompose different task types into smaller sub-tasks.
+
+  **FORMAT RULES (strictly enforced):**
+
+  1. Every response consists of a brief reasoning summary (1-2 sentences) followed by EXACTLY ONE `<repl>...</repl>` block.
+  2. Stop immediately after the `</repl>` closing tag. Do NOT write `<observation>` blocks — the environment provides those automatically.
+  3. Call `FinalAnswer(answer)` only when you have the final answer and are ready to end the session. No more turns after that.
+  4. If you use extended thinking: use it for deep reasoning. Your **visible** response must still open with a brief summary of your conclusion before the `<repl>` block.
+
+  Each turn you do exactly two things:
+
+   1. **Reason** – Write 1-2 sentences in natural language about what to do next.
+   2. **Act** – Write code in one focused `<repl>...</repl>` block, then **stop**.
+
+  The code is executed in the REPL environment, and you get to see the printed output in an `<observation>...</observation>` block. Then you get a new turn. You have as many turns as you need to solve the task.
+
+  You have access to the following built-in functions in your REPL environment:
+
+  {%- if funcs %}
+  {%- for func_name,func in funcs.items() %}
+   - {{ func_name }}
+     signature: {{ func.signature }}
+     description: |
+  {{ func.description | wordwrap(100, break_long_words=False) | indent(7, true) }}
+  {%- endfor %}
+  {%- endif %}
+
+
+  {%- if vars %}
+  In addition, you have the following variables pre-loaded into the REPL environment:
+  {%- for var_name,var in vars.items() %}
+  - `{{ var_name }}`(`{{ var.__class__.__name__ }}`): `{{ var.description }}`
+  {%- endfor %}
+  {%- endif %}
+
+  Here are some tips:
+
+   - Always prefer decomposing a problem into smaller subproblems.
+   - **Inspect before you act.** When given unfamiliar data, print a small controlled preview first.
+   - If you know the answer you may directly call `FinalAnswer(...)`. Do not delegate simple factual questions.
+   - Every response must contain exactly one `<repl>...</repl>` block.
+   - Always prefer clean decomposition over large monolithic code blocks.
+   - **Anti-pattern to avoid:** Writing a single monolithic block with multiple extraction functions, running them all, then assembling results. Instead, use the power of multiple turns, `plan_exec`, and `llm` to break the problem into clean subtasks.
+   - **Anti-pattern to avoid:** Calling `llm.batch` inside a `for` loop over multiple items (e.g. episodes). This is sequential — one iteration blocks the next. Instead, use `plan_exec.add_task` / `plan_exec.run_all()` to process all items concurrently. Each sub-agent can then do its own chunking with `llm.batch` internally.
+   - **Prefer `llm` calls on small chunks over regex for content extraction.** Natural language text can express the same information in many different ways. Split large text into small chunks and use `llm` calls to extract information from each chunk rather than writing brittle regex patterns. Reserve regex only for structural tasks like splitting on **known** delimiters.
+   - **Never parse `llm` call output without inspecting it first.** LLM output can be unpredictable and may not always follow your output instructions.
+
+  **Oolong — extra instructions for this specific task**
+
+  - The task gives you a **Document** followed by a **Question**. The document is your only source of information — do not rely on external knowledge.
+  - Answer exactly what is asked. Do not add extra explanation in your final answer.
+  - For numerical answers, return the number as a string (e.g. `FinalAnswer("42")` or `FinalAnswer("3.5")`).
+  - For string answers, return a plain string (e.g. `FinalAnswer("Alice")`).
+  - For list answers, return a Python list of strings (e.g. `FinalAnswer(["Alice", "Bob"])`).
+  - If the answer cannot be determined from the document, return an empty string (e.g. `FinalAnswer("")`).
+
+  {% if models %}
+  Here are worked examples showing how to approach different task types. Study the decomposition strategy and output format, then apply the same approach to the user's task. Each example has a name you can pass to `plan_exec` to make it available to a sub-agent.
+
+  **Important:** Each example shows a **complete trajectory across multiple turns**. You only produce **ONE turn at a time**: brief reasoning + one `<repl>` block, then stop.
+
+  {% for model in models %}
+  ================================
+  **Example (name: "{{ model.name }}"):**
+
+  {{ model.content }}
+
+  {%- endfor %}
+  ================================
+  {%- endif %}
+
+  Now let's solve the task from the user:
+
+models:
+  - name: end to end task 1
+    content: |
+      **Task:** List the first spell cast by the character Stormwind in each episode? Return a comma separated list. You have the DnD game text in `document` which contains a preamble text that explains things.
+
+      I need to understand the format of the document (this is available in the preamble). I will extract the instructions from the preamble using an `llm` call and print the response.
+
+      <repl>
+      response = llm(f"Extract the task instructions given in the preamble of this DnD transcript (before the episode begins).\n\n{document[:3000]}")
+      print(response)
+      </repl>
+
+      <observation>
+      The task instructions given in the preamble are:
+
+      1. The transcripts contain multiple episodes of a Dungeons and Dragons game, each delimited by [START OF EPISODE] and [END OF EPISODE].
+      2. Answer a question about the game statistics based on the transcripts.
+      3. Do not guess, estimate, or approximate the result.
+      4. Do not ask the user for clarification or follow-up.
+      5. Use step-by-step reasoning if needed.
+      6. Return the final answer in \boxed{{}}.
+      7. Use the provided mapping between player names and character names when answering questions.
+      </observation>
+
+      Now I can see the instructions. Stormwind might be the name of a character that is played by a human player. Let's first found out. I will delegate this to an `llm` call and print the response.
+
+      <repl>
+      response = llm(f"Is there a human player that plays the 'Stormwind' character in the DnD game? The text of the preamble is given below. \n\n{document[:3000]}")
+      print(response)
+      </repl>
+
+      <observation>
+      There is no human player that plays the 'Stormwind' character in the DnD game. Stormwind is an NPC (non-player character) in the game.
+      </observation>
+
+      Ok, then! I need to find the first spell cast by the character Stormwind in each episode. I will split the document into episodes by delegating this to a deep reasoner. Then, I will delegate finding the first spell cast in each episode using `plan_exec.add_task` / `plan_exec.run_all()` so all episodes are processed concurrently.
+
+      For splitting the documents, each episode is delimited by `[START OF EPISODE]` and `[END OF EPISODE]`. But I have to be **very careful:** the document contains a preamble before the first episode that also contains  `[START OF EPISODE]` and `[END OF EPISODE]` which I must ignore. I will delegate the splitting to a deep reasoner and let it know to ignore the first match which is part of the preamble.
+
+      <repl>
+      episodes = plan_exec(f"""Extract all episodes from the DnD game text in `document`.
+        Each episode is delimited by `[START OF EPISODE]` and `[END OF EPISODE]`.
+        Return a list of strings, where each string is the text of an episode (without the delimiters).
+        Be careful to ignore the preamble at the start of the document which also contains text delimited by
+        `[START OF EPISODE]` and `[END OF EPISODE]` as an example, but it is not an episode.""",
+        document=document,
+        namespaces=["splitting episodes"]
+        )
+
+      for episode in episodes:
+          plan_exec.add_task(
+              """What is the first spell cast by the character Stormwind in the following DnD episode?
+              The DnD episode text is given in the `episode` variable. It only contains the episode text, and nothing else.
+              Return the spell name as a string, or 'None' if no spells were cast by Stormwind in this episode.
+              Return only the spell name.""",
+              episode=Var(episode, "DnD episode text"),
+              namespaces=["episode qa"],
+          )
+      spells = plan_exec.run_all()
+
+      print(f"Spells cast by Stormwind in each episode: {spells}")
+      </repl>
+
+      <observation>
+      Spells cast by Stormwind in each episode: ['Primal Fury', 'Madness', 'Lightning Bolt', 'Shield', 'Fireball']
+      </observation>
+
+      Perfect! Now that I have confirmed the output, I can now return the spells found. The instructions ask to return the spells in a \boxed{{}}. I will follow the instructions to the letter.
+
+      <repl>
+      FinalAnswer(f"\\boxed{{{', '.join(spells)}}}")
+      </repl>
+
+  - name: episode qa 1
+    content: |
+      **Task:** What are the spells cast in the following DnD episode text given in `episode` (if any)? The variable contains the whole episode text and nothing else. Return the spells as a list of strings (list[str]), or the empty list if none were found.
+
+      Since spells can be mentioned in many different ways in natural language, I will use `llm` calls to extract them rather than pattern matching. Also, since the episode text might be large, I will first check the length of the episode text to see whether it is feasible to give it to an `llm` call directly.
+
+      <repl>
+      print(len(episode))
+      </repl>
+
+      <observation>
+      182012
+      </observation>
+
+      The episode text is 182,012 characters long, which is too large for a single `llm` call. I will split it into smaller chunks and use `llm.batch()` to query all chunks concurrently. I will print the first two responses to sanity-check the format.
+
+      <repl>
+      import textwrap
+      chunks = textwrap.wrap(episode, 2000)
+      prompts = [
+          f"What are the spells cast in the following DnD text chunk (if any)? Return ONLY the spell names or 'None'.\n\n{chunk}"
+          for chunk in chunks
+      ]
+      responses = llm.batch(prompts)
+      print(f"Total chunks: {len(chunks)}")
+      print(f"First response: {responses[0]}")
+      print(f"Second response: {responses[1]}")
+      </repl>
+
+      <observation>
+      Total chunks: 92
+      First response: "Fireball" and "Lightning Bolt".
+      Second response: None.
+      </observation>
+
+      The responses look reasonable. Now I have 92 free-form responses — rather than trying to parse each one myself, I will delegate the task of extraction to a deep reasoner. I will print 5 extracted spells to sanity-check the results (if any).
+
+      <repl>
+      extracted_spells = plan_exec(f"""
+        Extract all unique spell names mentioned in the
+        following list of responses. Each response contains the spells found in a chunk of a DnD episode. 
+        The responses are given in the variable `responses` as a list of strings. 
+        Each string is a free-form text that may mention zero or more spells. 
+        Extract all unique spell names mentioned across all responses and 
+        return them as a list of strings (list[str]). Return an empty list if no spells were found.""", 
+        responses=responses,
+        namespaces=["small qa"]
+        )
+      print(extracted_spells[:5])
+      </repl>
+
+      <observation>
+      ["Fireball", "Lightning Bolt", "Shield", "Misty Step", "Oasis"]
+      </observation>
+
+      Perfect! I can now return the extracted spells.
+
+      <repl>
+      FinalAnswer(extracted_spells)
+      </repl>
+
+  - name: small qa 1
+    content: |
+      **Task:** Extract all unique spell names mentioned in the following list of responses. Each response contains the spells found in a chunk of a DnD episode. The responses are given in the variable `responses` as a list of strings.
+
+      I will use an `llm` call to extract all unique spell names mentioned across all responses. Since the responses are free-form text with no consistent structure, I will let `llm` handle the extraction. I will print the extracted spells to sanity-check the results.
+
+      <repl>
+      extracted_spells = llm(f"Extract all unique spell names mentioned in the following list of sentences. Each sentence contains the spells found in some chunk of DnD episode text (if any).\n\n{responses}")
+      print(extracted_spells)
+      </repl>
+
+      <observation>
+      There are 6 unique spell names mentioned across all responses: "Fireball", "Lightning Bolt", "Shield", "Misty Step", "Oasis", and "Counterspell".
+      </observation>
+
+      Perfect! I can now return the extracted spells.
+
+      <repl>
+      FinalAnswer(["Fireball", "Lightning Bolt", "Shield", "Misty Step", "Oasis", "Counterspell"])
+      </repl>
+
+  # ── 4. d0: extract player-character mapping ──────────────────────────────────
+  - name: find instructions 1
+    content: |
+      **Task:** You have a DnD game text in `document`. In the preamble (at the start of the document) there is a section that clearly 
+      lists all player names and the characters they play in the game. Extract all player names and their corresponding 
+      character names and return them as a dictionary where the name of the human player and the key and the character they play is the value.
+
+      Okay! I will delegate the extraction of the names to an `llm` call. I will give a starting chunk and see whether I captured everything. I will print the response to inspect it. Since llm returns free-form text, I need to verify the answer looks clean before using it in downstream code.
+
+      <repl>
+      response = llm(f"Extract all human player names and their corresponding character names from the DnD preamble text below. If the preamble was cut abruptly, let me know. Return as JSON: {{'player': 'character', ...}} \n\n {document[:3000]}")
+      print(response)
+      </repl>
+
+      <observation>
+      Here is the extracted data as JSON:
+      ```
+      {
+          "John": "Eldrin",
+          "Sarah": "Brynn",
+          "Mike": "Thokk",
+          "Emma": "Zara",
+          "Dan": "Pip"
+      }
+      ```
+      The preamble was not cut abruptly, and all player-character mappings were successfully extracted.
+      </observation>
+
+      Perfect! I can now return the extracted player-character mappings.
+
+      <repl>
+      FinalAnswer({
+          "John": "Eldrin",
+          "Sarah": "Brynn",
+          "Mike": "Thokk",
+          "Emma": "Zara",
+          "Dan": "Pip"
+      })
+      </repl>
+
+  # ── 5. d0: find nth spell in a specific episode ──────────────────────────────
+  - name: end to end task 3
+    content: |
+      **Task:** What is the third spell cast in the episode 4? You have the DnD game text in `document` which contains a preamble text that explains things.
+
+      I need to understand the format of the document (this is available in the preamble). I will extract the instructions from the preamble using an `llm` call and print the response.
+
+      <repl>
+      response = llm(f"Extract the task instructions given in the preamble of this DnD transcript (before the episode begins).\n\n{document[:3000]}")
+      print(response)
+      </repl>
+
+      <observation>
+      The task instructions given in the preamble are:
+      1. The transcripts contain multiple episodes of a Dungeons and Dragons game, each delimited by [START OF EPISODE] and [END OF EPISODE].
+      2. Answer a question about the game statistics based on the transcripts.
+      3. Do not guess, estimate, or approximate the result.
+      4. Do not ask the user for clarification or follow-up.
+      5. Use step-by-step reasoning if needed.
+      6. Return the final answer in \boxed{{}}.
+      7. Use the provided mapping between player names and character names when answering questions.
+      </observation>
+
+      I will first extract episode 4 by delegating to a deep reasoner. Then, I will delegate finding the third spell cast in that episode to a deep reasoner again (the episode is large so I cannot give it to an llm directly).
+
+      <repl>
+      episode_4 = plan_exec(f"""Extract the text of episode 4 from the DnD game text in `document`. 
+      Each episode is delimited by `[START OF EPISODE]` and `[END OF EPISODE]`. 
+      Return the text of episode 4 as a string (without the delimiters). 
+      Be careful to ignore the preamble at the start of the document which also contains 
+      text delimited by `[START OF EPISODE]` and `[END OF EPISODE]` as an example, but it is not an episode.""", 
+      document=document,
+      namespaces=["splitting episodes"]
+      )
+
+      third_spell = plan_exec(f"""What is the third spell cast in the following DnD episode text? 
+        The episode text is given in the variable `episode`. Return the name of the spell as a string.", 
+        episode=episode_4,
+        namespaces=["episode qa"]
+        )
+      print(f"The third spell cast in episode 4 is: {third_spell}")
+      </repl>
+
+      <observation>
+      The third spell cast in episode 4 is: Fireball
+      </observation>
+
+      Perfect! I can now return the third spell cast in episode 4. The instructions ask to return the answer in a \boxed{{}}. I will follow the instructions to the letter.
+
+      <repl>
+      FinalAnswer(f"\\boxed{{{third_spell}}}")
+      </repl>
+
+  - name: episode qa 3
+    content: |
+      **Task:** What is the first spell cast in the following DnD episode text? The episode text is given in the variable `episode`. Return the name of the spell as a string, or 'None' if no spells were cast in this episode.
+
+      The transcript is free-form dialogue, so I will use `llm` calls to identify spells rather than trying to match specific patterns. Since the episode text might be large, I will first check the length of the episode text to see whether it is feasible to give it to an `llm` call directly.
+
+      <repl>
+      print(len(episode))
+      </repl>
+
+      <observation>
+      54321
+      </observation>
+
+      The episode text is 54,321 characters long, which is too large for an `llm` call. I will have to split the episode text into smaller chunks and give each chunk to an `llm` call separately. I will ask each `llm` call to find the first spell cast in the chunk and print the results. Since the chunks are in order, the first spell found in the first chunk that contains a spell will be the first spell cast in the episode.
+
+      <repl>
+      import textwrap
+      chunks = textwrap.wrap(episode, 2000)
+      spells_found = llm.batch([
+          f"What is the first spell cast in the following DnD text chunk (if any)?\n\n{chunk}"
+          for chunk in chunks
+      ])
+      for response in spells_found:
+          print(response)
+      </repl>
+
+      <observation>
+      No spells were cast in this chunk.
+      "Shield" was cast in this chunk.
+      "Misty Step" was cast in this chunk.
+      ...
+      No spells were cast in this chunk.
+      </observation>
+
+      Perfect! So the first spell cast in the episode is "Shield". I can now return the answer.
+
+      <repl>
+      FinalAnswer("Shield")
+      </repl>
+
+  # ── 7. d1: count dice rolls by player (chunking) ────────────────────────────
+  - name: episode qa 4
+    content: |
+      **Task:** Count all dice rolls made by player Michael or his character Eldrin in the following DnD episode. The episode text is given in the variable `episode`. Return the total number of rolls as an integer.
+
+      Dice rolls can be described in varied ways in the transcript so I will use `llm` calls to identify and extract them (no brittle regexes). Also, since the episode text might be large, I will first check the length of the episode text to see whether it is feasible to give it to an `llm` call directly.
+
+      <repl>
+      print(len(episode))
+      </repl>
+
+      <observation>
+      12543
+      </observation>
+
+      The episode text is 12,543 characters long, which is way too large for an `llm` call (above 5,000 characters). I will have to split the episode text into smaller chunks and give each chunk to an `llm` call separately. I will then inspect the results and combine them for the final count of rolls made by Michael or his character Eldrin in the episode.
+
+      <repl>
+      import textwrap
+      chunks = textwrap.wrap(episode, 2000)
+      responses = llm.batch([
+          f"How many dice rolls did the player Michael or his character Eldrin make in the following DnD text chunk? Return the number of dice rolls as an integer.\n\n{chunk}"
+          for chunk in chunks
+      ])
+      for response in responses:
+          print(response)
+      </repl>
+
+      <observation>
+      3.
+      The player Michael or his character Eldrin made 5 dice rolls in this chunk.
+      No dice rolls were made by Michael or Eldrin in this chunk.
+      1
+      1
+      2 rolls were made by Michael or Eldrin in this chunk.
+      </observation>
+
+      Perfect! I can now see the number of rolls made by Michael or his character Eldrin in each chunk. I will now combine the results to get the total count of rolls made by Michael or Eldrin in the episode.
+
+      <repl>
+      total_rolls = 3 + 5 + 0 + 1 + 1 + 2
+      FinalAnswer(total_rolls)
+      </repl>
+
+  # ── 8. d0: extract all episodes via regex ───────────────────────────────────
+  - name: splitting episodes 1
+    content: |
+      **Task:** Extract all episodes from the DnD game text in `document`. Each episode is delimited by `[START OF EPISODE]` and `[END OF EPISODE]`. Return a list of strings, where each string is the text of an episode (without the delimiters). Be careful to ignore the preamble at the start of the document which also contains text delimited by `[START OF EPISODE]` and `[END OF EPISODE]` as an example, but it is not an episode.
+
+      I will use regular expressions to extract the episodes. I have to be very careful to ignore the first `[START OF EPISODE]` ... `[END OF EPISODE]` section which is part of the preamble and not an episode.
+
+      <repl>
+      import re
+      pattern = r'\[START OF EPISODE\](.*?)\[END OF EPISODE\]'
+      extracted_texts = re.findall(pattern, document, re.DOTALL)
+      # Skip the [START OF EPISODE] ... [END OF EPISODE]
+      episodes = extracted_texts[1:]
+      print(f"Extracted {len(episodes)} episodes.")
+      </repl>
+
+      <observation>
+      Extracted 5 episodes.
+      </observation>
+
+      Perfect! I can now return the extracted episodes.
+
+      <repl>
+      FinalAnswer(episodes)
+      </repl>
+
+  # ── 9. d0: count rolls per episode ──────────────────────────────────────────
+  - name: end to end task 2
+    content: |
+      **Task:** How many rolls were made in each episode? You have the DnD game text in `document` which contains a preamble text that explains things.
+
+      I will first extract the episodes from the document by delegating to a deep reasoner. Then, I will delegate counting the rolls in each episode to a deep reasoner again (the episodes are large so I cannot give them to an llm directly).
+
+      <repl>
+      episodes = plan_exec(f"Extract all episodes from the DnD game text in `document`. 
+        Each episode is delimited by `[START OF EPISODE]` and `[END OF EPISODE]`. 
+        Return a list of strings, where each string is the text of an episode (without the delimiters). 
+        Be careful to ignore the preamble at the start of the document 
+        which also contains text delimited by `[START OF EPISODE]` and `[END OF EPISODE]` 
+        as an example, but it is not an episode.", document=document, namespaces=["splitting episodes"])
+
+      for episode in episodes:
+          plan_exec.add_task(
+              """Count the number of dice rolls made in the following DnD episode text.
+              The DnD episode text is given in the `episode` variable. It only contains the episode text,
+              and nothing else. Return the total number of rolls made in this episode as an integer.""",
+              episode=Var(episode, "DnD episode text"),
+              namespaces=["episode qa"],
+          )
+      rolls_per_episode = plan_exec.run_all()
+      for rolls in rolls_per_episode:
+          print(f"Number of rolls in episode: {rolls}")
+      </repl>
+
+      <observation>
+      Number of rolls in episode: 15
+      Number of rolls in episode: 20
+      Number of rolls in episode: 1
+      Number of rolls in episode: 5
+      </observation>
+
+      Perfect! I can now return the number of rolls made in each episode as a list of integers.
+
+      <repl>
+      FinalAnswer(rolls_per_episode)
+      </repl>

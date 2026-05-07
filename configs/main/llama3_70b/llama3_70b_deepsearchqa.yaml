@@ -1,0 +1,15 @@
+# DeepSearchQA, Llama3-70B, agent v02, 4 GPUs
+log_dir: logs/llama3_70b_deepsearchqa
+
+_compose:
+  - configs/experiment_base/inference_vllm_2gpu.yaml
+  - configs/experiment_base/model_llama3_70b.yaml
+  - configs/experiment_base/model_search_tool_llama3.yaml
+  - configs/experiment_base/benchmark_deepsearchqa.yaml
+
+task_timeout: 43200
+
+agent:
+  configs:
+    - configs/agents/deepsearchqa02.yaml
+  version: deepsearchqa_0.0.2

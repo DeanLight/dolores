@@ -1,0 +1,4 @@
+# No local vllm server; point model requests to a remote inference API.
+server:
+  base_url: "https://api.example.com/v1"
+  api_key_env: OPENAI_API_KEY

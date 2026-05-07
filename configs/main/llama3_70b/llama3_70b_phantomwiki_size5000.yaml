@@ -1,0 +1,21 @@
+# PhantomWiki, Llama3-70B, agent v03, size 5000
+log_dir: logs/llama3_70b_phantomwiki_size5000
+
+_compose:
+  - configs/experiment_base/inference_vllm_2gpu.yaml
+  - configs/experiment_base/model_llama3_70b.yaml
+  - configs/experiment_base/benchmark_phantom.yaml
+
+benchmark:
+  extra_params:
+    size: 5000
+
+vllm:
+  extra_args: ["--enable-prefix-caching", "--seed", "42", "--tensor-parallel-size", "2"]
+
+task_timeout: 43200
+
+agent:
+  configs:
+    - configs/agents/phantomwiki03.yaml
+  version: phantom_0.0.3

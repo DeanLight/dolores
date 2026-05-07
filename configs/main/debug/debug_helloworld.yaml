@@ -1,0 +1,14 @@
+# HelloWorld debug — remote API, 3 tasks
+log_dir: logs/my_exp
+
+_compose:
+  - configs/experiment_base/inference_remote_api.yaml
+  - configs/experiment_base/benchmark_helloworld.yaml
+
+benchmark:
+  key_limit: 3
+
+agent:
+  configs:
+    - configs/agents/debug.yaml
+  version: 0.0.3

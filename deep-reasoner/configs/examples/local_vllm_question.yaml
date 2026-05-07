@@ -1,0 +1,13 @@
+# Example: local OpenAI-compatible server (e.g. vLLM on port 8555).
+_compose:
+  - _debug_agent_body.yaml
+
+client:
+  base_url: "http://localhost:8555/v1"
+  api_key_env: VLLM_API_KEY
+
+model: "Qwen/Qwen3-32B"
+
+benchmark: "example"
+task_id: "local-vllm"
+log_dir: "logs"

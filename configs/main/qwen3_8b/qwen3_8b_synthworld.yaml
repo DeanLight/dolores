@@ -1,0 +1,14 @@
+# SynthWorld, Qwen3-8B, agent v01, 1 GPU
+log_dir: logs/qwen3_8b_synthworld
+
+_compose:
+  - configs/experiment_base/inference_vllm_1gpu.yaml
+  - configs/experiment_base/model_qwen3_8b.yaml
+  - configs/experiment_base/benchmark_synthworld.yaml
+
+batch_size: 100
+
+agent:
+  configs:
+    - configs/agents/synthworld.yaml
+  version: synthworld_0.0.1

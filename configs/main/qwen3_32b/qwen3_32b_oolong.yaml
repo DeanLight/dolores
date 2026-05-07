@@ -1,0 +1,12 @@
+# Oolong, Qwen3-32B, agent v02, 2 GPUs
+log_dir: logs/qwen3_32b_oolong
+
+_compose:
+  - configs/experiment_base/inference_vllm_2gpu.yaml
+  - configs/experiment_base/model_qwen3_32b.yaml
+  - configs/experiment_base/benchmark_oolong.yaml
+
+agent:
+  configs:
+    - configs/agents/oolong02.yaml
+  version: oolong_0.0.2

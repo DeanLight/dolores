@@ -1,0 +1,9 @@
+batch_size: 60
+task_timeout: 14400
+resume: true
+benchmark:
+  name: oolong
+  key_limit_seed: 42
+  extra_params:
+    limit: 500
+    seed: 42

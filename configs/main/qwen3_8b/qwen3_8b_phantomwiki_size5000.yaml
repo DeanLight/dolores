@@ -1,0 +1,18 @@
+# PhantomWiki, Qwen3-8B, agent v03, size 5000
+log_dir: logs/qwen3_8b_phantomwiki_size5000
+
+_compose:
+  - configs/experiment_base/inference_vllm_1gpu.yaml
+  - configs/experiment_base/model_qwen3_8b.yaml
+  - configs/experiment_base/benchmark_phantom.yaml
+
+benchmark:
+  extra_params:
+    size: 5000
+
+batch_size: 160
+
+agent:
+  configs:
+    - configs/agents/phantomwiki03.yaml
+  version: phantom_0.0.3

@@ -1,0 +1,14 @@
+# Oolong, Qwen3-8B, agent v02, 1 GPU
+log_dir: logs/qwen3_8b_oolong
+
+_compose:
+  - configs/experiment_base/inference_vllm_1gpu.yaml
+  - configs/experiment_base/model_qwen3_8b.yaml
+  - configs/experiment_base/benchmark_oolong.yaml
+
+batch_size: 100
+
+agent:
+  configs:
+    - configs/agents/oolong02.yaml
+  version: oolong_0.0.2

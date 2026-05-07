@@ -1,0 +1,12 @@
+# PhantomWiki, Qwen3-32B, decomposition instructions, size 500
+log_dir: logs/qwen3_32b_phantomwiki_size500_decomp
+
+_compose:
+  - configs/experiment_base/inference_vllm_1gpu.yaml
+  - configs/experiment_base/model_qwen3_32b.yaml
+  - configs/experiment_base/benchmark_phantom.yaml
+
+agent:
+  configs:
+    - configs/agents/phantomwiki_decomp.yaml
+  version: phantom_decomp_0.0.1

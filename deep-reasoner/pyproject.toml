@@ -1,0 +1,78 @@
+[project]
+name = "deep-reasoner"
+version = "0.1.0"
+description = "Iterative CodeAct agent (DeepReasoner) with OpenAI-compatible backends"
+readme = "README.md"
+authors = [
+    { name = "Dean Light", email = "your.email@example.com" }
+]
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "openai>=1.0.0",
+    "pydantic>=2.0.0",
+    "structlog>=23.0.0",
+    "joblib>=1.3.0",
+    "jinja2>=3.1.0",
+    "coolname>=2.0.0",
+    "nest-asyncio>=1.6.0",
+    "dynaconf>=3.2.0",
+    "python-dotenv>=1.0.0",
+    "httpx>=0.27.0",
+    "pandas>=2.0.0",
+    "pyyaml>=6.0.0",
+    "cyclopts>=2.0.0",
+    "semchunk>=4.0.0",
+    "juplit>=0.0.6",
+]
+
+[project.scripts]
+deep-reasoner = "deep_reasoner.cli_base:main_cli"
+
+[project.optional-dependencies]
+vllm = ["vllm"]
+
+[build-system]
+requires = ["uv_build>=0.9.21,<0.10.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = ""
+
+[dependency-groups]
+dev = [
+    "poethepoet>=0.25.0",
+    "ipykernel>=6.0.0",
+    "pre-commit>=3.0.0",
+    "pytest>=9.0.2",
+    "matplotlib>=3.10.8",
+]
+
+[tool.juplit]
+notebook_src_dir = "deep_reasoner"
+
+[tool.uv]
+constraint-dependencies = ["multiprocess==0.70.18"]
+
+[tool.pytest.ini_options]
+python_files = ["*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+[tool.jupytext]
+formats = "ipynb,py:percent"
+
+[tool.poe.tasks.init]
+help = "Install git pre-commit hooks"
+cmd = "pre-commit install"
+
+[tool.poe.tasks.sync]
+help = "Sync .py notebook files with their paired .ipynb notebooks"
+cmd = "juplit sync"
+
+[tool.poe.tasks.nb]
+help = "Generate .ipynb notebooks from .py files (run after cloning)"
+cmd = "juplit nb"
+
+[tool.poe.tasks.clean]
+help = "Sync notebooks then delete all .ipynb files (keeps workspace clean for AI agents)"
+cmd = "juplit clean"

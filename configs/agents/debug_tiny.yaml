@@ -1,0 +1,4 @@
+# Tiny override config for debug runs.
+# Layer this after `configs/agents/debug.yaml`.
+
+# model: "qwen/qwen3-4b-fp8"

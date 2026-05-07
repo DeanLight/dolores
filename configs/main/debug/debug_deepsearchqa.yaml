@@ -1,0 +1,20 @@
+# DeepSearchQA debug — remote API, 2 tasks
+log_dir: logs/deepsearchqa_debug
+
+_compose:
+  - configs/experiment_base/inference_remote_api.yaml
+  - configs/experiment_base/benchmark_deepsearchqa.yaml
+
+batch_size: 2
+task_timeout: 300
+
+benchmark:
+  key_limit: 2
+
+agent:
+  configs:
+    - model-configs/debug.yaml
+    - configs/agents/deepsearchqa.yaml
+  version: deepsearchqa_0.0.1
+  extra_params:
+    search_model_id: gpt-5-nano

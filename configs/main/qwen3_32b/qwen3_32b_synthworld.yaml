@@ -1,0 +1,12 @@
+# SynthWorld, Qwen3-32B, agent v01, 1 GPU
+log_dir: logs/qwen3_32b_synthworld
+
+_compose:
+  - configs/experiment_base/inference_vllm_1gpu.yaml
+  - configs/experiment_base/model_qwen3_32b.yaml
+  - configs/experiment_base/benchmark_synthworld.yaml
+
+agent:
+  configs:
+    - configs/agents/synthworld.yaml
+  version: synthworld_0.0.1

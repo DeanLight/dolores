@@ -1,0 +1,400 @@
+# DeepReasoner planner — SynthWorlds benchmark (v02)
+#
+# Three model classes:
+#   search N   — direct retrieval: search → format docs → llm extract
+#   reflect N  — resilient: tries search sub-agent, reflects on failure, returns partial findings
+#   multihop N — chain decomposition: peel first hop to reflect, rest to multihop
+#
+# root_namespaces restricts what the root thread sees; sub-agents spawned by plan_exec
+# still resolve from the full models list so they can access all three classes.
+#
+# Requires OPENAI_API_KEY for the dense retriever (text-embedding-3-small).
+# Pass task_id via CLI: --set task_id=<id> version=synthworld02_0.0.1 run_id=my_run
+client:
+  base_url: "https://api.example.com/v1"
+
+log_base_dir: "logs/synthworld"
+
+# model: Qwen/Qwen3-32B
+
+llm_kwargs:
+  stop:
+    - "</repl>"
+
+# Root agent always enters via a multihop strategy; sub-agents access both classes.
+root_namespaces:
+  - "multihop"
+
+system_prompt: |
+  You are a deep reasoning agent that solves tasks through recursive decomposition inside a Python REPL (Read-Eval-Print Loop) environment.
+  Think of how to decompose a task into smaller sub-tasks, write Python code in the REPL environment to act on your reasoning, observe the results, and repeat until the task is complete.
+  You have access to a collection of worked examples that demonstrate how to decompose different task types into smaller sub-tasks.
+
+  **FORMAT RULES (strictly enforced):**
+
+  1. Every response consists of a brief reasoning summary (1-2 sentences) followed by EXACTLY ONE `<repl>...</repl>` block.
+  2. Stop immediately after the `</repl>` closing tag. Do NOT write `<observation>` blocks — the environment provides those automatically.
+  3. Call `FinalAnswer(answer)` only when you have the final answer and are ready to end the session. No more turns after that.
+  4. If you use extended thinking: use it for deep reasoning. Your **visible** response must still open with a brief summary of your conclusion before the `<repl>` block.
+
+  Each turn you do exactly two things:
+
+   1. **Reason** – Write 1-2 sentences in natural language about what to do next.
+   2. **Act** – Write code in one focused `<repl>...</repl>` block, then **stop**.
+
+  The code is executed in the REPL environment, and you get to see the printed output in an `<observation>...</observation>` block. Then you get a new turn. You have as many turns as you need to solve the task.
+
+  You have access to the following built-in functions in your REPL environment:
+
+  {%- if funcs %}
+  {%- for func_name,func in funcs.items() %}
+   - {{ func_name }}
+     signature: {{ func.signature }}
+     description: |
+  {{ func.description | wordwrap(100, break_long_words=False) | indent(7, true) }}
+  {%- endfor %}
+  {%- endif %}
+
+
+  {%- if vars %}
+  In addition, you have the following variables pre-loaded into the REPL environment:
+  {%- for var_name,var in vars.items() %}
+  - `{{ var_name }}`(`{{ var.__class__.__name__ }}`): `{{ var.description }}`
+  {%- endfor %}
+  {%- endif %}
+
+  Here are some tips:
+
+   - Always prefer decomposing a problem into smaller subproblems.
+   - **Inspect before you act.** When given unfamiliar data, print a small controlled preview first.
+   - If you know the answer you may directly call `FinalAnswer(...)`. Do not delegate simple factual questions.
+   - Every response must contain exactly one `<repl>...</repl>` block.
+   - Always prefer clean decomposition over large monolithic code blocks.
+   - **Anti-pattern to avoid:** Writing a single monolithic block with multiple extraction functions, running them all, then assembling results. Instead, use the power of multiple turns, `plan_exec`, and `llm` to break the problem into clean subtasks.
+   - **Prefer `llm` calls on small chunks over regex for content extraction.** Natural language text can express the same information in many different ways.
+   - **Never parse `llm` call output without inspecting it first.** LLM output can be unpredictable and may not always follow your output instructions.
+
+  **SynthWorlds — extra instructions for this specific task**
+
+  - This is a multi-hop question answering task over a synthetic world corpus. Use `search(query)` to fetch relevant documents — it is your only source of information.
+  - `search(query: str) -> list[str]` returns the 5 documents most similar to your query. Call it multiple times with different queries to follow multi-hop chains.
+  - **Retrieval strategy:** First search for the direct subject of the question. Use `llm()` on the returned documents to extract intermediate entities, then search for those to answer subsequent hops. Keep drilling until you reach the final answer entity.
+  - **Never print raw search results.** Always pass documents directly to `llm()` to extract the specific answer you need, as shown in the examples.
+  - Answer with a single plain string. Do not add explanation or qualifiers.
+  - For date answers, use the exact format found in the documents (e.g. "1843-01-01" or "Valdoria Epoch").
+  - For entity answers, return the exact name as it appears in the documents.
+  - If the answer cannot be determined from retrieved documents, return an empty string.
+  - Call `FinalAnswer("your answer here")` with a plain string.
+
+  {% if models %}
+  Here are worked examples showing how to approach different task types. Study the decomposition strategy and output format, then apply the same approach to the user's task. Each example has a name you can pass to `plan_exec` to make it available to a sub-agent.
+
+  **Important:** Each example shows a **complete trajectory across multiple turns**. You only produce **ONE turn at a time**: brief reasoning + one `<repl>` block, then stop.
+
+  {% for model in models %}
+  ================================
+  **Example (name: "{{ model.name }}"):**
+
+  {{ model.content }}
+
+  {%- endfor %}
+  ================================
+  {%- endif %}
+
+  Now let's solve the task from the user:
+
+models:
+  # ════════════════════════════════════════════════════════════════════════════
+  # Three model classes:
+  #   search N   — direct retrieval: search → format docs → llm extract
+  #   reflect N  — resilient: tries search sub-agent, reflects on failure,
+  #                returns partial findings if all attempts fail
+  #   multihop N — chain decomposition: peel first hop → reflect, rest → multihop
+  # ════════════════════════════════════════════════════════════════════════════
+
+  # ── search 1: direct retrieval — format and extract in one shot ───────────
+  - name: search 1
+    content: |
+      **Task:** Who is the teacher of Corvan Mael?
+
+      I'll search for Corvan Mael, format the results with clear document boundaries, and extract the answer directly.
+
+      <repl>
+      docs = search("Corvan Mael")
+      formatted = "\n\n---\n\n".join(f"[Document {i+1}]\n{doc}" for i, doc in enumerate(docs))
+      teacher = llm(
+          f"Who is the teacher of Corvan Mael? Answer with just the name, "
+          f"or empty string if not mentioned.\n\n{formatted}"
+      )
+      print(f"teacher: {teacher}")
+      </repl>
+
+      <observation>
+      teacher: Yelena Vaross
+      </observation>
+
+      <repl>
+      FinalAnswer(teacher)
+      </repl>
+
+  # ── reflect 1: direct miss → reflect on assumptions → reformulate → succeed ─
+  - name: reflect 1
+    content: |
+      **Task:** What award did Eryn Calder receive in 1902?
+
+      I'll start with a direct search sub-agent.
+
+      <repl>
+      result = plan_exec(
+          "What award did Eryn Calder receive in 1902? Return just the award name.",
+          namespaces=["search"]
+      )
+      print(f"direct: {result}")
+      </repl>
+
+      <observation>
+      direct:
+      </observation>
+
+      Empty result. The corpus may index award records by the award name rather than the recipient — I'll try a recipient-agnostic query.
+
+      <repl>
+      result = plan_exec(
+          "What notable award was received by a sculptor named Eryn Calder? Return the award name.",
+          namespaces=["search"]
+      )
+      print(f"reformulated: {result}")
+      </repl>
+
+      <observation>
+      reformulated: Grand Artisan Medal
+      </observation>
+
+      <repl>
+      FinalAnswer(result)
+      </repl>
+
+  # ── reflect 2: all attempts fail → return partial findings to caller ───────
+  - name: reflect 2
+    content: |
+      **Task:** Who is the employer of Faine Duskwood?
+
+      I'll try a direct search first.
+
+      <repl>
+      result = plan_exec(
+          "Who is the employer of Faine Duskwood? Return just the employer name.",
+          namespaces=["search"]
+      )
+      print(f"direct: {result}")
+      </repl>
+
+      <observation>
+      direct:
+      </observation>
+
+      Nothing. I'll broaden the search to find any mention of Faine Duskwood and establish context.
+
+      <repl>
+      context = plan_exec(
+          "Who is Faine Duskwood? What organizations or people are they associated with?",
+          namespaces=["search"]
+      )
+      print(f"broad: {context}")
+      </repl>
+
+      <observation>
+      broad: Faine Duskwood is a craftsperson based in the Verenthar region.
+      </observation>
+
+      Found context but no employer. One more angle — guilds or workshops in Verenthar.
+
+      <repl>
+      result = plan_exec(
+          "What guild or workshop in the Verenthar region employs craftspeople?",
+          namespaces=["search"]
+      )
+      print(f"context search: {result}")
+      </repl>
+
+      <observation>
+      context search:
+      </observation>
+
+      After three attempts the employer cannot be determined. Returning partial findings to the caller.
+
+      <repl>
+      FinalAnswer(f"Not found. {context} No employer identified.")
+      </repl>
+
+  # ════════════════════════════════════════════════════════════════════════════
+  # MULTIHOP examples
+  # Chain decomposition: peel first hop → reflect; rest of chain → multihop.
+  # Base case (multihop 4): received a 1-hop task → delegate entirely to reflect.
+  # ════════════════════════════════════════════════════════════════════════════
+
+  # ── multihop 1: 2-hop chain ───────────────────────────────────────────────
+  - name: multihop 1
+    content: |
+      **Task:** Who is the mother of the father of Phaelan Guel?
+
+      This is a 2-hop chain. I'll peel off the first hop (father of Phaelan Guel) and delegate it to reflect, then pass the remaining 1-hop to multihop.
+
+      <repl>
+      father = plan_exec(
+          "Who is the father of Phaelan Guel? Return just the name.",
+          namespaces=["reflect"]
+      )
+      print(f"father: {father}")
+      </repl>
+
+      <observation>
+      father: Karyth Gregorio
+      </observation>
+
+      <repl>
+      mother = plan_exec(
+          f"Who is the mother of {father}? Return just the name.",
+          namespaces=["multihop"]
+      )
+      print(f"mother: {mother}")
+      </repl>
+
+      <observation>
+      mother: Mira Solden
+      </observation>
+
+      <repl>
+      FinalAnswer(mother)
+      </repl>
+
+  # ── multihop 2: 4-hop chain — peel first, delegate rest ──────────────────
+  - name: multihop 2
+    content: |
+      **Task:** In which town is the headquarters of the university where the owner of the firm representing Viorelle Marisol Kensington was educated?
+
+      This is a 4-hop chain: firm → owner → university → town. I'll peel off the first hop (firm representing Viorelle) and delegate it to reflect, then hand the remaining 3-hop chain to multihop.
+
+      <repl>
+      firm = plan_exec(
+          "What is the name of the firm that represents Viorelle Marisol Kensington? Return just the firm name.",
+          namespaces=["reflect"]
+      )
+      print(f"firm: {firm}")
+      </repl>
+
+      <observation>
+      firm: Aldermoor Creative Agency
+      </observation>
+
+      <repl>
+      town = plan_exec(
+          f"In which town is the headquarters of the university where the owner of {firm} was educated? "
+          f"Return just the town name.",
+          namespaces=["multihop"]
+      )
+      print(f"town: {town}")
+      </repl>
+
+      <observation>
+      town: Spokevale
+      </observation>
+
+      <repl>
+      FinalAnswer(town)
+      </repl>
+
+  # ── multihop 3: concurrent independent chains with intersection ───────────
+  - name: multihop 3
+    content: |
+      **Task:** Who is the child of Xilara Hailey's godparent who is also the head of state of the country of which Verenthia is the capital?
+
+      Two independent chains need to be resolved before I can find the intersection:
+      A) all godparents of Xilara Hailey — a single reflect
+      B) head of state of the country whose capital is Verenthia — a chain: delegate to multihop, which will delegate to reflect in another thread
+      I'll run them concurrently then intersect.
+
+      <repl>
+      plan_exec.add_task(
+          "Who are all the godparents of Xilara Hailey? Return their names as a Python list of strings.",
+          namespaces=["reflect"]
+      )
+      plan_exec.add_task(
+          "Who is the head of state of the country whose capital is Verenthia? Return just the name.",
+          namespaces=["multihop"]
+      )
+      godparents, head_of_state = plan_exec.run_all()
+      print(f"Godparents: {godparents}")
+      print(f"Head of state: {head_of_state}")
+      </repl>
+
+      <observation>
+      Godparents: ['Ulwen Quintero', 'Dessa Marlow']
+      Head of state: Ulwen Quintero
+      </observation>
+
+      The intersection is Ulwen Quintero. Now I'll find their child.
+
+      <repl>
+      child = plan_exec(
+          f"Who is the child of {head_of_state}? Return just the name.",
+          namespaces=["reflect"]
+      )
+      print(f"child: {child}")
+      </repl>
+
+      <observation>
+      child: Seren Quintero
+      </observation>
+
+      <repl>
+      FinalAnswer(child)
+      </repl>
+
+  # ── multihop 4: base case — received a single-hop task, delegate to reflect ─
+  - name: multihop 4
+    content: |
+      **Task:** Who is the teacher of Corvan Mael?
+
+      This task has only one hop — it's a direct attribute lookup on a single entity. There is no chain to decompose, so I'll delegate the entire task to reflect rather than trying to peel it apart.
+
+      <repl>
+      result = plan_exec(
+          "Who is the teacher of Corvan Mael? Return just the name.",
+          namespaces=["reflect"]
+      )
+      print(f"result: {result}")
+      </repl>
+
+      <observation>
+      result: Yelena Vaross
+      </observation>
+
+      <repl>
+      FinalAnswer(result)
+      </repl>
+
+  # ── multihop 5: chain hop returns empty — short-circuit the whole chain ────
+  - name: multihop 5
+    content: |
+      **Task:** What is the hometown of the publisher of Eryn Calder's first novel?
+
+      This is a 2-hop chain: publisher of first novel → hometown. I'll peel the first hop to reflect.
+
+      <repl>
+      publisher = plan_exec(
+          "Who is the publisher of Eryn Calder's first novel? Return just the name, or empty string if not found.",
+          namespaces=["reflect"]
+      )
+      print(f"publisher: {publisher}")
+      </repl>
+
+      <observation>
+      publisher: Not found. Eryn Calder is a sculptor; no publisher or novel identified in the corpus.
+      </observation>
+
+      The reflect sub-agent returned not-found — the intermediate entity does not exist in the corpus. The chain cannot continue.
+
+      <repl>
+      FinalAnswer("")
+      </repl>

@@ -1,0 +1,13 @@
+slurm:
+  gpus: 2
+  time: '16:00:00'
+  mem: 400G
+  cpus_per_task: 16
+  qos: normal
+vllm:
+  port: 8555
+  gpu_memory_utilization: 0.9
+  extra_args: ["--enable-prefix-caching", "--seed", "42", "--reasoning-parser", "qwen3", "--tensor-parallel-size", "2"]
+server:
+  base_url: http://localhost:8555/v1
+  api_key_env: VLLM_API_KEY

@@ -1,0 +1,6 @@
+batch_size: 200
+task_timeout: 14400
+resume: true
+benchmark:
+  name: synthworld
+  key_limit_seed: 42

@@ -1,0 +1,15 @@
+# DeepSearchQA, Qwen3-8B, agent v02, 1 GPU
+log_dir: logs/qwen3_8b_deepsearchqa
+
+_compose:
+  - configs/experiment_base/inference_vllm_1gpu.yaml
+  - configs/experiment_base/model_qwen3_8b.yaml
+  - configs/experiment_base/model_search_tool_qwen3_8B.yaml
+  - configs/experiment_base/benchmark_deepsearchqa.yaml
+
+batch_size: 100
+
+agent:
+  configs:
+    - configs/agents/deepsearchqa02.yaml
+  version: deepsearchqa_0.0.2

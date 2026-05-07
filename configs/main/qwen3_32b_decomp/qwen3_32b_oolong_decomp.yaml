@@ -1,0 +1,12 @@
+# Oolong, Qwen3-32B, decomposition instructions, 2 GPUs
+log_dir: logs/qwen3_32b_oolong_decomp
+
+_compose:
+  - configs/experiment_base/inference_vllm_2gpu.yaml
+  - configs/experiment_base/model_qwen3_32b.yaml
+  - configs/experiment_base/benchmark_oolong.yaml
+
+agent:
+  configs:
+    - configs/agents/oolong_decomp.yaml
+  version: oolong_decomp_0.0.1

@@ -1,0 +1,20 @@
+# SynthWorld, Llama3-70B, agent v02, 2 GPUs
+log_dir: logs/llama3_70b_synthworld_v2
+
+_compose:
+  - configs/experiment_base/inference_vllm_2gpu.yaml
+  - configs/experiment_base/model_llama3_70b.yaml
+  - configs/experiment_base/benchmark_synthworld.yaml
+
+vllm:
+  extra_args: ["--enable-prefix-caching", "--seed", "42", "--tensor-parallel-size", "2"]
+
+task_timeout: 43200
+
+# benchmark:
+#   key_limit: 200
+
+agent:
+  configs:
+    - configs/agents/synthworld02.yaml
+  version: synthworld_v2_0.0.1

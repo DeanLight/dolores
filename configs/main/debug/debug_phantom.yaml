@@ -1,0 +1,19 @@
+# PhantomWiki debug — remote API, 2 tasks, size 50
+log_dir: logs/my_exp
+
+_compose:
+  - configs/experiment_base/inference_remote_api.yaml
+  - configs/experiment_base/benchmark_phantom.yaml
+
+batch_size: 2
+task_timeout: 600
+
+benchmark:
+  key_limit: 2
+  extra_params:
+    size: 50
+
+agent:
+  configs:
+    - model-configs/debug.yaml
+  version: 0.0.3

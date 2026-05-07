@@ -1,0 +1,6 @@
+vllm:
+  extra_args: ["--enable-prefix-caching", "--seed", "42", "--tool-call-parser", "llama3_json", 
+    "--enable-auto-tool-choice", "--tensor-parallel-size", "2"]
+agent:
+  extra_params:
+    search_model_id: hosted_vllm/meta-llama/Llama-3.3-70B-Instruct
