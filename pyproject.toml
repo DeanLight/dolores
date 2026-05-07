@@ -14,7 +14,7 @@ description = "Dolores publication evaluation code, benchmarks, and DeepReasoner
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 license = { text = "Apache-2.0" }
-authors = [{ name = "Michael Theologitis", email = "michael.theologitis@outlook.com" }]
+authors = [{ name = "bob", email = "bob@gmail.com" }]
 dependencies = [
     "beautifulsoup4>=4.12.3",
     "cyclopts>=2.0.0",
