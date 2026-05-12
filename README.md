@@ -2,6 +2,8 @@
 
 Publication evaluation code, benchmarks, and experiment harness used in the paper.
 
+🚧 🏗️ 👷 This repo is the **publication** home for the deep reasoning project — a user-facing release is on the way. 🛠️ ✨
+
 ### Layout
 
 ```text
