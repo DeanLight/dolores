@@ -18,7 +18,7 @@
 #
 # `dispatch` enumerates a benchmark's tasks, skips ones already done, brings the
 # inference backend up once (fast-fail), and fans out one child subprocess per
-# task. Each child re-runs `python -m dolores.unified.cli run --config <yaml> --task-id <id>` so
+# task. Each child re-runs `python -m dolores.unified run --config <yaml> --task-id <id>` so
 # the YAML config is the single source of truth across parent and children.
 
 # %%
@@ -88,7 +88,7 @@ def dispatch(agent_name: str, cfg, *, config_path, task_ids=None, max_workers=8,
     def cmd_builder(item: tuple[str, int]) -> list[str]:
         tid, attempt = item
         return [
-            sys.executable, "-m", "dolores.unified.cli", "run",
+            sys.executable, "-m", "dolores.unified", "run",
             "--config", abs_config, "--task-id", str(tid), "--attempt", str(attempt),
             *(child_args or []),
         ]

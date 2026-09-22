@@ -4,7 +4,7 @@
 # on deepresearchqa, Qwen3-32B), from analysis/dr_vs_baseline_token_ratios.csv.
 #
 # Run with:
-#   python -m dolores.unified.cli run --config configs/token_matched/deepresearchqa_rlm_try_hard.yaml
+#   python -m dolores.unified run --config configs/token_matched/deepresearchqa_rlm_try_hard.yaml
 
 # ── token budget ─────────────────────────────────────────────────────────────
 # 205,014 tokens = 2 x k_b x this baseline's 18,003 mean tokens per task,

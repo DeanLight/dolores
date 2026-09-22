@@ -4,7 +4,7 @@
 # on phantomwiki, Qwen3-32B), from analysis/dr_vs_baseline_token_ratios.csv.
 #
 # Run with:
-#   python -m dolores.unified.cli run --config configs/token_matched/phantomwiki_codeact_samplek.yaml
+#   python -m dolores.unified run --config configs/token_matched/phantomwiki_codeact_samplek.yaml
 
 # ── sample count ─────────────────────────────────────────────────────────────
 # ceil(k_b) = ceil(9.865) = 10 attempts, so this baseline's total spend

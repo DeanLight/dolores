@@ -115,7 +115,7 @@ class DeepresearchAgent(Agent):
 # %%
 if test():
     # Live smoke (needs a served model):
-    #   uv run python -m dolores.unified.cli run --config configs/debug_deepsearchqa.yaml --task-id <id>
+    #   uv run python -m dolores.unified run --config configs/debug_deepsearchqa.yaml --task-id <id>
     pass
 
 # %% [markdown]

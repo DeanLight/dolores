@@ -77,7 +77,7 @@ class ReactAgent(Agent):
 # %%
 if test():
     # Live smoke (needs a served model):
-    #   uv run python -m dolores.unified.cli run --config configs/debug_helloworld.yaml --task-id fib_7
+    #   uv run python -m dolores.unified run --config configs/debug_helloworld.yaml --task-id fib_7
     pass
 
 # %% [markdown]

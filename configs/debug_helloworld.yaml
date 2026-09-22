@@ -1,5 +1,5 @@
 # Unified-CLI debug config — no dataset, no tools beyond pure Python functions.
-#   python -m dolores.unified.cli run --config configs/debug_helloworld.yaml --task-id fib_7
+#   python -m dolores.unified run --config configs/debug_helloworld.yaml --task-id fib_7
 # Reserved keys (agent/model/benchmark/inference/max_steps/max_workers/
 # no_thinking/shuffle) are consumed by the framework; anything else flows into
 # the AgentCfg as an agent-specific extra.

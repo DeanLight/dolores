@@ -1,0 +1,22 @@
+# Deep Reasoner — DeepSearchQA, Qwen3-32B, decomposition instructions, 1 GPU
+# Converted 1:1 from the paper's configs/main/qwen3_32b_decomp/qwen3_32b_deepsearchqa_decomp.yaml (dolores.experiment format).
+#   python -m dolores.unified run --config configs/deep_reasoner/qwen3_32b_decomp/deepresearchqa.yaml
+#   bash scripts/sbatch_baselines.sh --configs configs/deep_reasoner/qwen3_32b_decomp/deepresearchqa.yaml
+#
+# max_steps 30 is the planner's max_iter (the MainConfig default the paper ran
+# with); vllm_args are the exact extra vLLM flags that run served the model with.
+
+agent: deep_reasoner
+agent_config: configs/agents/deepsearchqa_decomp.yaml
+version: deepsearchqa_decomp_0.0.1
+model: Qwen/Qwen3-32B
+log_dir: logs/qwen3_32b_deepsearchqa_decomp
+inference: {kind: openai, api_base: 'http://localhost:8555/v1', api_key: EMPTY}
+benchmark: {name: deepresearchqa, seed: 42}
+max_steps: 30
+max_workers: 80
+task_timeout: 36000
+search_model_id: hosted_vllm/Qwen/Qwen3-32B
+vllm_args: [--enable-prefix-caching, --seed, '42', --reasoning-parser, qwen3, --tool-call-parser, hermes, --enable-auto-tool-choice]
+vllm_gpu_mem: 0.9
+slurm: {gpus: 1, tensor_parallel: 1, cpus_per_task: 8, mem: 200G, time: '16:00:00'}

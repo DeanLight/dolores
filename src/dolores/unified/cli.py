@@ -14,14 +14,14 @@
 # ---
 
 # %% [markdown]
-# # CLI — `python -m dolores.unified.cli run`
+# # CLI — `python -m dolores.unified run`
 #
 # One entry point for every agent. A YAML config names the `agent`, `model`,
 # `benchmark`, and `inference` backend; reserved keys are split out and anything
 # else flows into the `AgentCfg` as agent-specific extras.
 #
 # ```
-# python -m dolores.unified.cli run --config configs/debug_helloworld.yaml [--task-id fib_7] [--max-workers N]
+# python -m dolores.unified run --config configs/debug_helloworld.yaml [--task-id fib_7] [--max-workers N]
 # ```
 #
 # With `--task-id` it runs one task (child mode); without, it fans out via the
@@ -134,7 +134,7 @@ def parse_config(cfg_dict: dict, *, token_budget: int | None = None,
 
 # %%
 def main(argv=None) -> None:
-    parser = argparse.ArgumentParser(prog="python -m dolores.unified.cli")
+    parser = argparse.ArgumentParser(prog="python -m dolores.unified")
     sub = parser.add_subparsers(dest="command", required=True)
     runp = sub.add_parser("run", help="Run an agent over a benchmark from a YAML config.")
     runp.add_argument("--config", required=True, help="Path to the run config YAML.")
@@ -587,6 +587,31 @@ def test_baseline_configs_compose_and_parse():
         assert cfg.get("samples", 1) == 1
 
 
+def test_deep_reasoner_configs_parse():
+    """Every Deep Reasoner run config parses and names a planner YAML that exists."""
+    import os
+    from unittest.mock import patch
+
+    configs = sorted(Path("configs/deep_reasoner").rglob("*.yaml"))
+    assert configs, "no Deep Reasoner configs found"
+    variants = {p.parent.name for p in configs}
+    assert {"qwen3_32b", "qwen3_8b", "llama3_70b",
+            "qwen3_32b_decomp", "qwen3_32b_nomodel"} <= variants
+
+    for path in configs:
+        merged = load_config(path)
+        assert Path(merged["agent_config"]).is_file(), f"{path}: missing planner YAML"
+        assert isinstance(merged["vllm_args"], list), f"{path}: vllm_args must be a list"
+        assert merged["slurm"]["gpus"] >= merged["slurm"]["tensor_parallel"], path
+        with patch.dict(os.environ, {"SERPER_API_KEY": "smoke-test-key"}):
+            agent_name, cfg, runner_opts = parse_config(merged)
+        assert agent_name == "deep_reasoner"
+        assert cfg.max_steps == 30, f"{path}: the paper's planner ran max_iter=30"
+        assert runner_opts["task_timeout"], f"{path}: missing the per-task timeout"
+        if cfg.benchmark.benchmark_name() == "deepresearchqa":
+            assert cfg.get("search_model_id"), f"{path}: DeepSearchQA needs a search model"
+
+
 def test_parse_config_benchmark_kwargs():
     agent_name, cfg, _ = parse_config({
         "agent": "react",
@@ -612,6 +637,7 @@ if test():
     test_prompt_provenance_matches_the_table()
     test_deepresearch_configs_carry_both_prompts()
     test_baseline_configs_compose_and_parse()
+    test_deep_reasoner_configs_parse()
     test_parse_config_benchmark_kwargs()
     print("cli tests passed")
 
