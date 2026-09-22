@@ -48,23 +48,22 @@ character for character.
 
 ## Source of truth
 
-Port from the upstream head of the token-matched work: the smoke-test and SLURM fixes on
-top of the consolidated specs (commit `e9efa29`). **Pin this commit before porting.**
-That branch is still in review upstream, so if more fixes land, move the pin to the
-commit the final runs actually used.
+Port from the upstream token-matched work including the smoke-test and SLURM fixes,
+pinned at merge commit `ed05708` (tree identical to fix head `e9efa29`). Every ported
+file is copied from that commit.
 
 ## Proposed layout
 
-A new, self-contained package `src/unified/` holds the unified path, with imports
-rewritten from `deepreasoner_baselines.X` to `unified.X`. The shared top-level modules
+A new subpackage `src/dolores/unified/` holds the unified path, with imports
+rewritten from `deepreasoner_baselines.X` to `dolores.unified.X`. The shared top-level modules
 (`config`, `core`, `prompts`) get the upstream additions merged in so that nothing is
 duplicated.
 
 ```text
 src/
-  unified/                     # NEW — unified agent path (used by token-matched runs)
+  dolores/unified/             # NEW — unified agent path (used by token-matched runs)
     __init__.py
-    cli.py                     # `python -m unified.cli run --config ...` (+ --attempt, --limit,
+    cli.py                     # `python -m dolores.unified.cli run --config ...` (+ --attempt, --limit,
                                #   --token-budget, --samples, --api-base overrides, _compose loader)
     runner.py                  # plan_work -> (task_id, attempt) pairs; dispatch
     obs.py                     # completion-call patches + budget/seed seam
@@ -78,11 +77,9 @@ src/
   config.py                    # MODIFIED — add `Paths` next to RunContext/settings
   core.py                      # MODIFIED — add count_attempts, run_subprocess_pool
   prompts.py                   # UNCHANGED (optionally add the provenance cell)
-  baselines/ benchmarks/ dolores/   # UNCHANGED — paper-run path stays as-is
+  baselines/ benchmarks/ dolores/*.py   # UNCHANGED — paper-run path stays as-is
 configs/
   token_matched/               # NEW — 28 run configs + README (numbers and prompts inlined)
-  base/                        # NEW — 15 _compose fragments (models, benchmarks, prompts)
-  baselines/<model>/           # NEW — 42 unmatched reference configs on the same code path
 analysis/
   token_matched.py             # NEW — load_attempts, aggregate, accuracy_vs_k, budget_report, token_summary
   dr_vs_baseline_token_ratios.csv   # NEW — the measured k_b per cell every config cites
@@ -100,7 +97,7 @@ Port only what the token-matched path uses:
   wrapper around `deep_reasoner.cli_base`.
 - **Reuse, don't duplicate**, `src/benchmarks/deepresearchqa/deepresearch_agent.py` and
   `open_deep_research/` if they match upstream once the `hosted_vllm/` litellm prefix
-  fix is applied. Otherwise port the upstream copy under `unified/benchmarks/`.
+  fix is applied. Otherwise port the upstream copy under `dolores/unified/benchmarks/`.
 - **Skip** the big-runs (Qwen3-Coder-480B) configs, `sync_*_logs.sh`, and any design,
   plan or help docs.
 
@@ -114,9 +111,9 @@ Port only what the token-matched path uses:
 - Test: `pytest src/baselines src/dolores` still passes, and a legacy
   `run_baseline.sh --dry-run` still produces the same commands as before.
 
-### 2. `src/unified/` port
+### 2. `src/dolores/unified/` port
 - Copy the files listed above from the pinned commit. Rewrite imports with `sed`
-  (`deepreasoner_baselines.` → `unified.`, `deepreasoner_baselines.config` →
+  (`deepreasoner_baselines.` → `dolores.unified.`, `deepreasoner_baselines.config` →
   `config`, `deepreasoner_baselines.core` → `core`, `deepreasoner_baselines.prompts` →
   `prompts`).
 - Keep the files byte-identical otherwise, so an import-normalised diff against
@@ -127,8 +124,13 @@ Port only what the token-matched path uses:
   `src/`.
 
 ### 3. Configs
-- Copy `configs/token_matched/` (28 files plus README), `configs/base/` and
-  `configs/baselines/`.
+- Copy `configs/token_matched/` (28 files plus README). Each file is self-contained,
+  with prompts and numbers inlined and no `_compose`.
+- Leave out upstream `configs/baselines/`, the 42 unmatched configs that re-run the
+  original baselines through the unified path, and `configs/base/`, the fragments that
+  only those configs compose. Sample-k's attempt 0 (`accuracy_vs_k` at j=1) already gives
+  that single-attempt number on the same code path. The `_compose` loader stays in
+  `cli.py` as part of the verbatim port.
 - Check each config: model paths, `api_base`/port and SLURM resources must use env
   vars or defaults, never cluster paths.
 
@@ -142,16 +144,15 @@ Port only what the token-matched path uses:
   optional, empty-by-default env var.
 
 ### 5. Analysis
-- Add `analysis/token_matched.py` (imports → `unified.benchmarks`, `config`) and
-  `dr_vs_baseline_token_ratios.csv`.
-- Decide whether the paper's token-matched table or figure is generated here. If so,
-  add it to `analysis/results.py` or a sibling notebook, together with the result CSVs
-  it reads (as the other `*_results.csv` files would be).
+- Add `analysis/token_matched.py` (imports → `dolores.unified.benchmarks`, `config`)
+  and `dr_vs_baseline_token_ratios.csv`, the input every config's numbers cite.
+- Code only, no result files: `python -m analysis.token_matched -r '<log glob>'`
+  regenerates the majority@k / best@k / budget tables from a user's own run logs.
 
 ### 6. Dependencies (`pyproject.toml`)
 - Add `conflit`, `parse` and `coolname` (`coolname` currently arrives only
   transitively, through `deep-reasoner`).
-- Add `unified` to `[tool.setuptools] packages` (with its subpackages).
+- Add `dolores.unified` and its subpackages to `[tool.setuptools] packages`.
 - Pre-existing gap worth fixing in the same PR: `smolagents`, `rlms`, `transformers`
   and `huggingface-hub` are imported by `src/baselines/` but not declared.
 
@@ -160,13 +161,13 @@ Port only what the token-matched path uses:
   others (dry run, then 5-task limit, then full). Cover both arms, the `--token-budget`
   and `--samples` smoke overrides, and the post-hoc
   `python -m analysis.token_matched` step.
-- `README.md`: add `src/unified/` and `configs/token_matched/` to the layout tree.
+- `README.md`: add `src/dolores/unified/` and `configs/token_matched/` to the layout tree.
 
 ### 8. Tests and verification (no GPU needed)
 - `pytest` over `src/` and `analysis/`. The ported tests include the ones that check
   every token-matched config against the ratio CSV, and every inlined prompt against
   `prompts.py`.
-- `python -m unified.cli run --config configs/token_matched/phantomwiki_react_try_hard.yaml --dry-run`
+- `python -m dolores.unified.cli run --config configs/token_matched/phantomwiki_react_try_hard.yaml --dry-run`
   for one config per benchmark.
 - `bash scripts/sbatch_baselines.sh --token-matched 'configs/token_matched/*.yaml' --dry-run`
   must list 28 jobs and the expected attempt counts.
@@ -182,22 +183,17 @@ checked too.
 ## Suggested commit sequence
 
 1. shared-module additions (`config`, `core`) + deps
-2. `src/unified/` port (imports rewritten, otherwise verbatim)
-3. configs (`token_matched`, `base`, `baselines`) + ratio CSV
+2. `src/dolores/unified/` port (imports rewritten, otherwise verbatim)
+3. `configs/token_matched/` + ratio CSV
 4. scripts
-5. `analysis/token_matched.py` (+ paper table hook if applicable)
+5. `analysis/token_matched.py`
 6. `reproduction.md` + README; delete this plan
 
-## Open questions
+## Decisions
 
-1. **Package name.** Is `src/unified/` the right name, or should this go under
-   `src/dolores/` (e.g. `dolores.baselines_unified`)?
-2. **Pinned commit.** Is `e9efa29` what the final token-matched runs used, or will
-   more fixes land first?
-3. **Unmatched reference configs** (`configs/baselines/`, 42 files). Does the paper
-   report these same-code-path reference runs? If not, drop them.
-4. **Results.** Should the token-matched result CSVs and figure code ship here (like
-   the existing `analysis/*_results.csv` pattern), or only the code to regenerate them?
-5. **Legacy baselines.** Keep `src/baselines/*.py` (the code the main-table numbers
-   came from) alongside the unified path? The recommendation is yes: both paths stay,
-   and reproduction.md says which paper result each one produces.
+1. **Source:** upstream merge commit `ed05708` (token-matched work + smoke/SLURM fixes).
+2. **Package:** `src/dolores/unified/`, run as `python -m dolores.unified.cli`.
+3. **Unmatched reference configs** (`configs/baselines/`, `configs/base/`): not ported (see §3).
+4. **Results:** code to regenerate only; no result CSVs or figures.
+5. **Legacy baselines:** `src/baselines/*.py` stays; `reproduction.md` says which paper
+   result each path produces.
