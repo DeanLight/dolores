@@ -68,7 +68,7 @@ def plan_work(agent_name: str, cfg, *, task_ids=None, shuffle=None):
 
 
 def dispatch(agent_name: str, cfg, *, config_path, task_ids=None, max_workers=8,
-             shuffle=None, child_args=None) -> None:
+             shuffle=None, child_args=None, task_timeout=None) -> None:
     """Parent: bring the backend up, then fan out one child per pending task."""
     work, all_ids = plan_work(agent_name, cfg, task_ids=task_ids, shuffle=shuffle)
     samples = cfg.get("samples", 1)
@@ -95,7 +95,7 @@ def dispatch(agent_name: str, cfg, *, config_path, task_ids=None, max_workers=8,
 
     cfg.inference.wait_until_ready()
     try:
-        run_subprocess_pool(cmd_builder, work, max_workers)
+        run_subprocess_pool(cmd_builder, work, max_workers, timeout=task_timeout)
     finally:
         stop = getattr(cfg.inference, "stop", None)
         if callable(stop):

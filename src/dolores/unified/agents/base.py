@@ -122,6 +122,14 @@ class Agent(ABC):
 
         return _parsed_for_phantomwiki(self.cfg.benchmark, answer)
 
+    def _parse(self, task: Task, answer: Any) -> Any:
+        """The ``parsed`` field, with the task in hand. Default: ``_parsed(answer)``."""
+        return self._parsed(answer)
+
+    def _score(self, task: Task, answer: Any, parsed: Any) -> Any:
+        """The ``scores`` field. Default: the benchmark scores the raw answer."""
+        return self.cfg.benchmark.score(task.task_id, answer)
+
     def _instructions(self, default: str | None) -> str | None:
         """The run config's inlined prompt when it supplies one, else *default*."""
         return self.cfg.get("instructions") or default
@@ -173,8 +181,8 @@ class Agent(ABC):
                 answer = budget.last_text or ""
                 stop_reason = "context_exceeded"
 
-        parsed = self._parsed(answer)
-        scores = bench.score(task.task_id, answer)
+        parsed = self._parse(task, answer)
+        scores = self._score(task, answer, parsed)
         result = AgentResult(
             task_id=task.task_id,
             question=task.question,

@@ -74,17 +74,27 @@ def run_subprocess_pool(
     cmd_builder: Callable[[str], list[str]],
     work: list[str],
     max_workers: int,
+    timeout: float | None = None,
 ) -> None:
-    """Fan out task IDs as subprocess workers; retry each indefinitely on failure."""
+    """Fan out task IDs as subprocess workers; retry each indefinitely on failure.
+
+    ``timeout`` (seconds) kills a worker that runs too long. A timed-out task is
+    recorded and not retried: it would most likely time out again.
+    """
 
     def _launch(tid: str) -> None:
         while True:
-            r = subprocess.run(
-                cmd_builder(tid),
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
+            try:
+                r = subprocess.run(
+                    cmd_builder(tid),
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    timeout=timeout,
+                )
+            except subprocess.TimeoutExpired:
+                print(f"⏱ {tid} timed out after {timeout}s — not retried")
+                return
             if r.returncode == 0:
                 return
             tail = (r.stderr or "").strip().splitlines()[-1:]
@@ -153,8 +163,22 @@ def test_count_attempts():
         assert counts["never_seen"] == 0
 
 
+def test_run_subprocess_pool_timeout_is_not_retried():
+    import sys
+
+    calls = []
+
+    def cmd_builder(tid):
+        calls.append(tid)
+        return [sys.executable, "-c", "import time; time.sleep(5)"]
+
+    run_subprocess_pool(cmd_builder, ["slow"], max_workers=1, timeout=0.5)
+    assert calls == ["slow"], "a timed-out task must not be relaunched"
+
+
 # %%
 if test():
     test_find_tested_ids()
     test_count_attempts()
+    test_run_subprocess_pool_timeout_is_not_retried()
     print("core tests passed")

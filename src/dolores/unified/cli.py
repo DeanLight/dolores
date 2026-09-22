@@ -45,7 +45,7 @@ from dolores.unified.runner import dispatch
 # Top-level YAML keys consumed by the framework/runner; everything else is an
 # agent-specific extra fed to AgentCfg.
 RESERVED_KEYS = {"agent", "model", "benchmark", "inference",
-                 "max_steps", "max_workers", "no_thinking", "shuffle"}
+                 "max_steps", "max_workers", "no_thinking", "shuffle", "task_timeout"}
 # Token-matched runs add token_budget / samples / temperature / instructions
 # (plus subagent_instructions, which only deepresearch reads).
 # Those are NOT reserved: they ride through as AgentCfg extras, which is how the
@@ -106,6 +106,9 @@ def parse_config(cfg_dict: dict, *, token_budget: int | None = None,
     runner_opts = {
         "max_workers": d.pop("max_workers", 8),
         "shuffle": d.pop("shuffle", None),
+        # Seconds before a task's child process is killed and recorded as timed out
+        # (not retried). None = no limit.
+        "task_timeout": d.pop("task_timeout", None),
     }
     cfg = AgentCfg(
         model=model, inference=inference, benchmark=benchmark,
@@ -185,6 +188,7 @@ def main(argv=None) -> None:
             child_args += ["--api-key", args.api_key]
         dispatch(agent_name, cfg, config_path=args.config, task_ids=task_ids,
                  max_workers=max_workers, shuffle=runner_opts["shuffle"],
+                 task_timeout=runner_opts["task_timeout"],
                  child_args=child_args)
 
 
@@ -221,7 +225,7 @@ def test_parse_config_splits_reserved_and_extras():
     assert cfg.no_thinking is True
     assert cfg.get("agent_config") == "configs/agents/debug.yaml"
     assert cfg.get("max_depth") == 6
-    assert runner_opts == {"max_workers": 4, "shuffle": None}
+    assert runner_opts == {"max_workers": 4, "shuffle": None, "task_timeout": None}
 
 
 def test_parse_config_token_matched_keys():
@@ -332,7 +336,7 @@ def test_dispatch_forwards_overrides_to_children():
                    inference=OpenAIBackend(api_base="http://x", api_key="k"))
     seen = []
 
-    def _capture(cmd_builder, work, max_workers):
+    def _capture(cmd_builder, work, max_workers, **_):
         seen.extend(cmd_builder(item) for item in work)
 
     with tempfile.TemporaryDirectory() as tmp, \
