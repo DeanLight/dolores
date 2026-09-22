@@ -1,0 +1,245 @@
+# phantomwiki x rlm — SAMPLE-K (11 attempts per task, aggregated post hoc)
+#
+# k_b = 10.819 (Deep Reasoner total tokens / rlm total tokens per task
+# on phantomwiki, Qwen3-32B), from analysis/dr_vs_baseline_token_ratios.csv.
+#
+# Run with:
+#   python -m dolores.unified.cli run --config configs/token_matched/phantomwiki_rlm_samplek.yaml
+
+# ── sample count ─────────────────────────────────────────────────────────────
+# ceil(k_b) = ceil(10.819) = 11 attempts, so this baseline's total spend
+# is at least what Deep Reasoner spent on this cell. Rounding up never
+# under-spends, which is the direction that keeps the comparison fair.
+# ── prompt ───────────────────────────────────────────────────────────────────
+# Verbatim PHANTOM_WIKI_RLM_INSTRUCTIONS from prompts.py.
+# This is the benchmark half only: rlm's own RLM_SYSTEM_PROMPT still leads,
+# exactly as it does without a config.
+
+agent: rlm
+log_dir: logs/token_matched/samplek
+slurm:
+  gpus: 2
+  tensor_parallel: 2
+  cpus_per_task: 16
+model: Qwen/Qwen3-32B
+inference:
+  kind: openai
+  api_base: http://localhost:8555/v1
+  api_key: EMPTY
+benchmark:
+  name: phantomwiki
+  size: 500
+  seed: 1
+max_workers: 32
+max_steps: 75
+temperature: 0.8
+samples: 11
+instructions: |-
+  The final answer must follow these rules:
+    - Multiple answers: comma-separated, e.g. "Alice Smith,Bob Jones"
+    - No answer found: empty string ""
+    - Numerical answer: just the number, e.g. "4" or "6,5" for multiple
+    - Numerical answer not found: "0"
+
+  Here are some examples to understand how to use the tools available to you:
+
+  ---
+
+  ```repl
+  article = retrieve_article(entity="Aida Wang")
+  print(article)
+  ```
+
+  "# Aida Wang ## Family The sisters of Aida Wang are Barabara Beltran, Vicki Hackworth. The mother of Aida Wang is Shelli Beltran. The father of Aida Wang is Dino Beltran. The daughter of Aida Wang is Johnetta Wang. The husband of Aida Wang is Ryan Wang. ## Friends The friends of Aida Wang are Alvaro Smock, Lannie Smock, Leslee Toombs, Ryan Wang. ## Attributes The date of birth of Aida Wang is 0985-05-30. The occupation of Aida Wang is personal assistant. The hobby of Aida Wang is meditation. The gender of Aida Wang is female."
+
+  ---
+
+  ```repl
+  article = retrieve_article(entity="Ivana Smith")
+  print(article)
+  ```
+
+  "No article exists for the requested entity. Please try retrieving article for another entity."
+
+  ---
+
+  ```repl
+  article = retrieve_article(entity="Alvaro Smock")
+  print(article)
+  ```
+
+  "# Alvaro Smock ## Family The sons of Alvaro Smock are Eli Smock, Gene Smock.  The wife of Alvaro Smock is Lannie Smock.
+  ## Friends The friends of Alvaro Smock are Dino Beltran, Gene Smock, Aida Wang.  ## Attributes The date of birth of Alvaro Smock is
+  0867-07-12.  The occupation of Alvaro Smock is osteopath.  The hobby of Alvaro Smock is biology"
+
+  ---
+
+  ```repl
+  article = retrieve_article(entity="Alvaro Smock")
+  print(article)
+  ```
+
+  "# Alvaro Smock ## Family The sons of Alvaro Smock are Eli Smock, Gene Smock.  The wife of Alvaro Smock is Lannie Smock.
+  ## Friends The friends of Alvaro Smock are Dino Beltran, Gene Smock, Aida Wang.  ## Attributes The date of birth of Alvaro Smock is
+  0867-07-12.  The occupation of Alvaro Smock is osteopath.  The hobby of Alvaro Smock is biology.  The gender of Alvaro Smock is male."
+
+  ---
+
+  ```repl
+  mother_article = retrieve_article(entity="Shelli Beltran")
+  print(mother_article)
+  ```
+
+  "# Shelli Beltran ## Family The sister of Shelli Beltran is Stacia Toombs.  The mother of Shelli Beltran is Alison Smock.
+  The father of Shelli Beltran is Williams Smock.  The daughters of Shelli Beltran are Aida Wang, Barabara Beltran, Vicki Hackworth.  The
+  husband of Shelli Beltran is Dino Beltran.  ## Friends The friends of Shelli Beltran are Brian Beltran, Eli Smock, Isiah Lutz, Leslee
+  Toombs, Lesley Lutz, Ryan Wang.  ## Attributes The date of birth of Shelli Beltran is 0958-03-08.  The occupation of Shelli Beltran is
+  occupational therapist.  The hobby of Shelli Beltran is sociology.  The gender of Shelli Beltran is female."
+
+  ---
+
+  ```repl
+  article = retrieve_article(entity="Stacia Toombs")
+  print(article)
+  ```
+
+  "# Stacia Toombs ## Family The sister of Stacia Toombs is Shelli Beltran.  The mother of Stacia Toombs is Alison Smock.
+  The father of Stacia Toombs is Williams Smock.  The daughter of Stacia Toombs is Leslee Toombs.  The husband of Stacia Toombs is Wilbert
+  Toombs.  ## Friends The friends of Stacia Toombs are Brian Beltran, Isiah Lutz, Leeann Hackworth, Lesley Lutz, Ryan Wang.  ##
+  Attributes The date of birth of Stacia Toombs is 0959-03-22.  The occupation of Stacia Toombs is actuary.  The hobby of Stacia Toombs is
+  finance.  The gender of Stacia Toombs is female."
+
+  ---
+
+  ```repl
+  husband_article = retrieve_article(entity="Wilbert Toombs")
+  print(husband_article)
+  ```
+
+  "# Wilbert Toombs ## Family The daughter of Wilbert Toombs is Leslee Toombs.  The wife of Wilbert Toombs is Stacia Toombs.
+  ## Friends ## Attributes The date of birth of Wilbert Toombs is 0956-07-26.  The occupation of Wilbert Toombs is theatre manager.  The
+  hobby of Wilbert Toombs is radio-controlled car racing.  The gender of Wilbert Toombs is male."
+  ```
+
+  ---
+
+  ```repl
+  article = retrieve_article(entity="Lannie Smock")
+  print(article)
+  ```
+
+  "# Lannie Smock ## Family The sons of Lannie Smock are Eli Smock, Gene Smock.  The husband of Lannie Smock is Alvaro Smock.
+  ## Friends The friends of Lannie Smock are Williams Smock, Aida Wang, Alison Smock.  ## Attributes The date of birth of Lannie Smock
+  is 0867-08-24.  The occupation of Lannie Smock is biomedical scientist.  The hobby of Lannie Smock is bus spotting.  The gender of
+  Lannie Smock is female."
+
+  ---
+
+  ```repl
+  eli_article = retrieve_article(entity="Eli Smock")
+  print(eli_article)
+  ```
+
+  "# Eli Smock ## Family The brother of Eli Smock is Gene Smock.  The mother of Eli Smock is Lannie Smock.  The father of Eli
+  Smock is Alvaro Smock.  ## Friends The friends of Eli Smock are Leisa Lutz, Shelli Beltran, Vicki Hackworth, Virgil Hackworth, Alison
+  Smock, Brian Beltran.  ## Attributes The date of birth of Eli Smock is 0901-01-18.  The occupation of Eli Smock is retail manager.  The
+  hobby of Eli Smock is tether car.  The gender of Eli Smock is male."
+
+  ---
+
+  ```repl
+  gene_article = retrieve_article(entity="Gene Smock")
+  print(gene_article)
+  ```
+
+  "# Gene Smock ## Family The brother of Gene Smock is Eli Smock.  The mother of Gene Smock is Lannie Smock.  The father of
+  Gene Smock is Alvaro Smock.  The son of Gene Smock is Williams Smock.  The wife of Gene Smock is Dominique Smock.  ## Friends The
+  friends of Gene Smock are Leeann Hackworth, Leisa Lutz, Ricardo Hackworth, Alvaro Smock, Dominique Smock.  ## Attributes The date of
+  birth of Gene Smock is 0898-08-16.  The occupation of Gene Smock is immunologist.  The hobby of Gene Smock is architecture.  The gender
+  of Gene Smock is male."
+
+  ---
+
+  ```repl
+  dom_article = retrieve_article(entity="Dominique Smock")
+  print(dom_article)
+  ```
+
+  Observation: "# Dominique Smock ## Family The son of Dominique Smock is Williams Smock.  The husband of Dominique Smock is Gene Smock.
+  ## Friends The friends of Dominique Smock are Gene Smock, Isiah Lutz, Orlando Beltran, Vicki Hackworth.  ## Attributes The date of birth
+  of Dominique Smock is 0897-09-08.  The occupation of Dominique Smock is sports therapist.  The hobby of Dominique Smock is dominoes.
+  The gender of Dominique Smock is female."
+
+  ---
+  Task: "What is the date of birth of the person whose hobby is finance?"
+
+  Thought: First, I need to search for people whose hobby is finance.
+  ```repl
+  results = search(attribute="finance")
+  print(results)
+  ```
+
+  "(1) Stacia Toombs"
+
+  ---
+
+  ```repl
+  article = retrieve_article(entity="Stacia Toombs")
+  print(article)
+  ```
+
+  Observation: "# Stacia Toombs ## Family The sister of Stacia Toombs is Shelli Beltran.  The mother of Stacia Toombs is Alison Smock.
+  The father of Stacia Toombs is Williams Smock.  The daughter of Stacia Toombs is Leslee Toombs.  The husband of Stacia Toombs is Wilbert
+  Toombs.  ## Friends The friends of Stacia Toombs are Brian Beltran, Isiah Lutz, Leeann Hackworth, Lesley Lutz, Ryan Wang.  ##
+  Attributes The date of birth of Stacia Toombs is 0959-03-22.  The occupation of Stacia Toombs is actuary.  The hobby of Stacia Toombs is
+  finance.  The gender of Stacia Toombs is female."
+
+  ---
+
+  ```repl
+  results = search(attribute="biomedical scientist")
+  print(results)
+  ```
+
+  "(1) Lannie Smock"
+
+  ---
+
+  ```repl
+  article = retrieve_article(entity="Lannie Smock")
+  print(article)
+  ```
+
+  Observation: "# Lannie Smock ## Family The sons of Lannie Smock are Eli Smock, Gene Smock.  The husband of Lannie Smock is Alvaro Smock.
+  ## Friends The friends of Lannie Smock are Williams Smock, Aida Wang, Alison Smock.  ## Attributes The date of birth of Lannie Smock
+  is 0867-08-24.  The occupation of Lannie Smock is biomedical scientist.  The hobby of Lannie Smock is bus spotting.  The gender of
+  Lannie Smock is female."
+
+  "# Eli Smock ## Family The brother of Eli Smock is Gene Smock.  The mother of Eli Smock is Lannie Smock.  The father of Eli
+  Smock is Alvaro Smock.  ## Friends The friends of Eli Smock are Leisa Lutz, Shelli Beltran, Vicki Hackworth, Virgil Hackworth, Alison
+  Smock, Brian Beltran.  ## Attributes The date of birth of Eli Smock is 0901-01-18.  The occupation of Eli Smock is retail manager.  The
+  hobby of Eli Smock is tether car.  The gender of Eli Smock is male."
+
+  ---
+
+  ```repl
+  gene_article = retrieve_article(entity="Gene Smock")
+  print(gene_article)
+  ```
+
+  "# Gene Smock ## Family The brother of Gene Smock is Eli Smock.  The mother of Gene Smock is Lannie Smock.  The father of Gene Smock is Alvaro Smock.  The son of Gene Smock is Williams Smock.  The wife of Gene Smock is Dominique Smock.  ## Friends The
+  friends of Gene Smock are Leeann Hackworth, Leisa Lutz, Ricardo Hackworth, Alvaro Smock, Dominique Smock.  ## Attributes The date of
+  birth of Gene Smock is 0898-08-16.  The occupation of Gene Smock is immunologist.  The hobby of Gene Smock is architecture.  The gender
+  of Gene Smock is male."
+
+  ---
+
+  ```repl
+  article = retrieve_article(entity="Ryan Wang")
+  print(article)
+  ```
+
+  "# Ryan Wang ## Family The daughter of Ryan Wang is Johnetta Wang.  The wife of Ryan Wang is Aida Wang.  ## Friends The
+  friends of Ryan Wang are Shelli Beltran, Stacia Toombs, Virgil Hackworth, Aida Wang.  ## Attributes The date of birth of Ryan Wang is
+  0982-03-17.  The occupation of Ryan Wang is chief of staff.  The hobby of Ryan Wang is fossil hunting.  The gender of Ryan Wang is
+  male."

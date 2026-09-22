@@ -1,0 +1,41 @@
+# oolong x rlm — TRY HARD (uncapped turns, 7.2x this baseline's spend, don't give up)
+#
+# k_b = 3.583 (Deep Reasoner total tokens / rlm total tokens per task
+# on oolong, Qwen3-32B), from analysis/dr_vs_baseline_token_ratios.csv.
+#
+# Run with:
+#   python -m dolores.unified.cli run --config configs/token_matched/oolong_rlm_try_hard.yaml
+
+# ── token budget ─────────────────────────────────────────────────────────────
+# 2,775,366 tokens = 2 x k_b x this baseline's 387,297 mean tokens per task,
+# i.e. twice the 1,387,683 Deep Reasoner spends here. Strictly more than
+# Deep Reasoner used, so the run cannot be called starved.
+# ── prompt ───────────────────────────────────────────────────────────────────
+# No instructions, by design: per the author's provenance table, rlm on
+# oolong runs on rlm's default (the original paper used a different split). That is a deliberate choice, not a gap,
+# so this arm adds only the don't-give-up paragraph below.
+
+agent: rlm
+log_dir: logs/token_matched/try_hard
+slurm:
+  gpus: 2
+  tensor_parallel: 2
+  cpus_per_task: 16
+model: Qwen/Qwen3-32B
+inference:
+  kind: openai
+  api_base: http://localhost:8555/v1
+  api_key: EMPTY
+benchmark:
+  name: oolong
+  limit: 500
+  seed: 42
+max_workers: 32
+max_steps: 100000
+token_budget: 2775366
+instructions: |-
+  Do not give up. Keep decomposing the question into smaller sub-questions,
+  retrieving what each one needs, and verifying what you find. If a step fails or a
+  lead goes nowhere, try a different approach rather than answering from what you
+  already have. Only give a final answer once you have exhausted the avenues
+  available to you.

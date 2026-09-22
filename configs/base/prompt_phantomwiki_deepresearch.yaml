@@ -1,0 +1,11 @@
+# The system prompt deepresearch runs with on phantomwiki.
+# Verbatim PHANTOM_WIKI_DEEPRESEARCH_INSTRUCTIONS from src/prompts.py — a test asserts
+# these stay identical, so editing here changes only this config's runs.
+
+agent: deepresearch
+instructions: |-
+  The final answer must follow these rules:
+    - Multiple answers: comma-separated, e.g. "Alice Smith,Bob Jones"
+    - No answer found: empty string ""
+    - Numerical answer: just the number, e.g. "4" or "6,5" for multiple
+    - Numerical answer not found: "0"

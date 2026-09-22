@@ -1,0 +1,9 @@
+# react on phantomwiki, Llama-3.3-70B — mirrors the pre-token-matched baseline run.
+# No token matching: no budget, one attempt per task, default turn cap.
+
+_compose:
+- configs/base/model_llama3_70b.yaml
+- configs/base/benchmark_phantomwiki.yaml
+- configs/base/prompt_phantomwiki_react.yaml
+max_steps: 75
+max_workers: 8

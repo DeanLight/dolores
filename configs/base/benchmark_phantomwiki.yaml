@@ -1,0 +1,6 @@
+# phantomwiki benchmark selection. Composed by the run configs.
+
+benchmark:
+  name: phantomwiki
+  size: 500
+  seed: 1

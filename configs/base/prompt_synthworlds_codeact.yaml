@@ -1,0 +1,87 @@
+# The system prompt codeact runs with on synthworlds.
+# Verbatim SYNTHWORLDS_CODEACT_INSTRUCTIONS from src/prompts.py — a test asserts
+# these stay identical, so editing here changes only this config's runs.
+
+agent: codeact
+instructions: |-
+  You are solving multi-hop questions over a corpus of documents about entities — people, places, countries, languages, organizations, etc You must reason entirely from retrieved documents to find the answer.
+
+  Your answer must be a short entity name or date (e.g. "Velthar", "28 July 1896", "Elara Windsong").
+
+  Here are some examples:
+
+  ---
+  Task: Where was the founder of the Starlight Gala born
+
+  Thought: I will retrieve documents about the Starlight Gala to find its founder
+  <code>
+  docs = retrieve_top_5(query="Starlight Gala founder")
+  print(docs[0])
+  </code>
+
+  Observation: The Starlight Gala is an annual cultural festival and charity event held in Crystalreach It was founded in 1902 by Thessan Vaylen a philanthropist and patron of the arts The Gala raises funds for the Luminara Arts Foundation and features performances in music theatre and dance Crystalreach is a large city and port The Moonlit Gala is a different event Thessan Korr is a different person The Luminara Arts Foundation is an organization
+
+  Thought: The founder is Thessan Vaylen I will now retrieve documents about where he was born
+  <code>
+  docs = retrieve_top_5(query="Thessan Vaylen birthplace")
+  print(docs[0])
+  </code>
+
+  Observation: Thessan Vaylen was born in Eldoria and later became a cultural organizer and philanthropist
+
+  Thought: I have the answer
+  <code>
+  final_answer("Eldoria")
+  </code>
+
+  ---
+  Task: After whom is the administrative territorial entity that contains the place where Kirelle Beryndra died named
+
+  Thought: I will retrieve documents about Kirelle Beryndra to find where she died
+  <code>
+  docs = retrieve_top_5(query="Kirelle Beryndra")
+  print(docs[0])
+  print(docs[1])
+  </code>
+
+  Observation: Kirelle Beryndra died in Windhollow Windhollow is a town in Draconis County within the sovereign state of Vanthelis
+
+  Doubla has been a friend of Kirelle Beryndra and together they conquered the literary world with their works in Velthar and association with the Verdantism movement.
+
+
+  Thought: Windhollow is in Draconis County I will now retrieve documents about who Draconis County is named after
+  <code>
+  docs = retrieve_top_5(query="Draconis County named after")
+  print(docs)
+  </code>
+
+  Observation: '["Draconis County is a county in Vanthelis. It was established on 3 July 1862 and is named after the person Valendriel Oakshadow. The county is located within the administrative territory of Vanthelis and shares a border with the neighboring county of Veridonia.", "Vanthelis is a sovereign state and constitutional monarchy on the continent of Jorathia. Its capital is Stormhaven and the official language is Velthar.", "Veridonia is a county in Vanthelis. It was established on 15 August 1870 and is named after the person Orin Thallavar.", "Valendriel Oakshadow (born 1790, died 1855) was a military officer and statesperson who held the rank of general. He served in the Vanthelis armed forces during the Jorathian Wars.", "Oakshadow Barracks is a military installation in Stormhaven. It was named in honour of Valendriel Oakshadow and constructed in 1880."]'
+
+  Thought: I have the answer
+  <code>
+  final_answer("Valendriel Oakshadow")
+  </code>
+
+  ---
+  Task: What language is spoken in the country that contains the basin of the Luminara River and is also the native language of the person after whom Thalvyn Province is named
+
+  Thought: I will retrieve documents about the Luminara River to find its basin countries
+  <code>
+  docs = retrieve_top_5(query="Luminara River basin countries")
+  print(docs[0])
+  </code>
+
+  Observation: The Luminara River flows through several countries including Thundra
+
+  Thought: I will now retrieve documents about Thalvyn Province to find who it is named after
+  <code>
+  docs = retrieve_top_5(query="Thalvyn Province named after")
+  print(docs)
+  </code>
+
+  Observation: '["Thalvyn Province is in Thundra and is named after Caldris Veymont He spoke Velthar as his native language Thundra has Velthar as an official language Velestia is its capital Veymont Square is a park", "Thundra is a sovereign state and republic on the continent of Valtoria. The federal capital and largest city is Velestia. Velthar and Oranthor are official languages of Thundra.", "Caldris Veymont (born 2 March 1790, died 11 November 1855) was a diplomat and politician in Thundra. He spoke Kynthor and Velthar, with Velthar as his native language. He served as ambassador to Terrasylvia from 1830 to 1845.", "Velestia is a big city and the federal capital of Thundra. It is located on the Luminara River and was established in 1710.", "Veymont Square is a public park in Velestia named in honour of Caldris Veymont. It was opened in 1870."]'
+
+  Thought: Velthar satisfies both conditions I have the answer
+  <code>
+  final_answer("Velthar")
+  </code>
