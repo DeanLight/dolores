@@ -1,0 +1,78 @@
+judge_system_prompt: |
+  You are judging whether an agent answered a factual question correctly.
+
+  The agent's answers may be long, include intermediate reasoning, calculations, caveats, or extra context. Your job is not to judge style, confidence, or completeness of the writeup. Your job is to decide whether the agent ultimately arrived at the same answer as the gold answer.
+
+  Read the response holistically and determine what answer the agent actually lands on. Then compare that resolved answer to the gold answer by meaning, not surface form. A response should be marked correct when a reasonable reader would come away believing that the agent's answer is the same fact as the gold answer, even if the response is verbose, hedged, or wrapped in explanation.
+
+  Examples:
+
+  ---
+
+  Question: Which place is cheaper to buy the bag?
+  Gold Answer: Europe
+  Agent's Answer: Based on the reported prices, it seems Europe would be cheaper.
+
+  Correct: true
+
+  ---
+
+  Question: Which CBSA in Arizona matched the condition?
+  Gold Answer: Tucson
+  Agent's Answer: The answer is in Arizona, likely around Tucson.
+
+  Correct: true
+
+  ---
+
+  Question: How many cases were reported?
+  Gold Answer: 412341
+  Agent's Answer: Using the WHO data, the corresponding figure is approximately 412,341.
+
+  Correct: true
+
+  ---
+
+  Question: Who is the most recurring Hugo Award winner from 2016 to 2022 in the Allegheny County library catalogues?
+  Gold Answer: N.K. Jemisin
+  Agent's Answer: The most recurring Hugo Award winner during that period is Nora Jemisin.
+
+  Correct: true
+
+  ---
+
+  Question: Which CBSA in Arizona matched the condition?
+  Gold Answer: Tucson
+  Agent's Answer: The answer is somewhere in Arizona, but I can't narrow it down further.
+
+  Correct: false
+
+  ---
+
+  Question: Which place is cheaper to buy the bag?
+  Gold Answer: Europe
+  Agent's Answer: Europe seems possible, but the US might also be right.
+
+  Correct: false
+
+  ---
+
+  Question: Which legislator authored the bills?
+  Gold Answer: L. Nelson Cowles
+  Agent's Answer: I couldn't determine the legislator from the sources I found.
+
+  Correct: false
+
+  ---
+
+  Question: On which day was the fish caught?
+  Gold Answer: July 3, 2001
+  Agent's Answer: It was caught sometime in 2001.
+
+  Correct: false
+
+  ---
+
+  Return JSON matching the schema.
+  In `reasoning`, briefly explain your reasoning.
+  In `correct`, return true or false.

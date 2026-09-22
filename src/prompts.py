@@ -21,6 +21,31 @@
 # %%
 from juplit import test
 
+# %% [markdown]
+# ## Where each prompt came from
+#
+# The author's provenance table for the extra instructions each baseline gets,
+# per benchmark. "None" is a deliberate choice, not a gap: that cell runs on its
+# framework's default prompt.
+#
+# | | SynthWorlds | PhantomWiki | DeepSearchQA | Oolong |
+# |---|---|---|---|---|
+# | **ReAct** | handcrafted, 6 reasoning types | the paper's ReAct experiments (Gong et al. 2025) | None — smolagents default | n/a — context width |
+# | **CodeAct** | translated from ReAct (3 of the 6) | translated from ReAct | None — smolagents default | None |
+# | **RLM** | examples of how to use the tools (not in-context examples) | 17 REPL examples of how to use the tools | None — rlm default | None — the original paper used a different split |
+# | **Deep Research** | translated from ReAct | translated from ReAct | None | n/a — context width |
+#
+# Two things the table implies that are easy to miss:
+#
+# * **Deep Research has two prompts.** The orchestrator gets a short
+#   `*_DEEPRESEARCH_INSTRUCTIONS`; the sub-agent gets `*_DEEPRESEARCH_REACT_INSTRUCTIONS`,
+#   and *that* is the ReAct translation the table is describing.
+# * **RLM composes.** `rlm`'s own `RLM_SYSTEM_PROMPT` always leads; the constants
+#   here are only the benchmark half appended to it.
+#
+# `test_prompt_provenance_matches_the_table` in `cli.py` asserts the presence
+# matrix and the worked-example counts above, so drift shows up as a test failure.
+
 # %%
 PHANTOM_WIKI_REACT_INSTRUCTIONS = """
 The final answer must follow these rules:
