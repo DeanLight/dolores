@@ -1,4 +1,4 @@
-# codeact on deepresearchqa, Llama-3.3-70B — mirrors the pre-token-matched baseline run.
+# codeact on deepresearchqa, Llama-3.3-70B — the paper's baseline run.
 # No token matching: no budget, one attempt per task, default turn cap.#
 # NOTE: codeact runs deepresearchqa with no instructions today, so this config
 # sets none either — it mirrors the existing run rather than inventing a prompt.

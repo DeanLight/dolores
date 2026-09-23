@@ -1,5 +1,4 @@
 # Deep Reasoner — DeepSearchQA, Qwen3-8B, agent v02, 1 GPU
-# Converted 1:1 from the paper's configs/main/qwen3_8b/qwen3_8b_deepsearchqa.yaml (dolores.experiment format).
 #   python -m dolores.unified run --config configs/deep_reasoner/qwen3_8b/deepresearchqa.yaml
 #   bash scripts/sbatch_runs.sh --configs configs/deep_reasoner/qwen3_8b/deepresearchqa.yaml
 #

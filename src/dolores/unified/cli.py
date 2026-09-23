@@ -65,7 +65,7 @@ def load_config(path: str | Path) -> dict:
     includes = cfg.pop("_compose", [])
     merged: dict = {}
     for include in includes:
-        # Composed paths are repo-relative, like configs/main's _compose lists.
+        # Composed paths are repo-relative.
         merged.update(load_config(include))
     merged.update(cfg)
     return merged
@@ -279,7 +279,7 @@ def _prompt_constant(name: str) -> str:
 
 # ReAct and Deep Research cannot run Oolong — its long-context documents exceed
 # their context window — so those two cells are excluded everywhere, matching the
-# combo list in scripts/sbatch_baselines.sh.
+# configs under configs/baselines/ and configs/token_matched/.
 IMPOSSIBLE_CELLS = {("oolong", "react"), ("oolong", "deepresearch")}
 BENCHMARK_NAMES = ["phantomwiki", "synthworlds", "oolong", "deepresearchqa"]
 BASELINE_NAMES = ["react", "codeact", "rlm", "deepresearch"]

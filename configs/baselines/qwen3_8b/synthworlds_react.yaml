@@ -1,4 +1,4 @@
-# react on synthworlds, Qwen3-8B — mirrors the pre-token-matched baseline run.
+# react on synthworlds, Qwen3-8B — the paper's baseline run.
 # No token matching: no budget, one attempt per task, default turn cap.
 
 _compose:

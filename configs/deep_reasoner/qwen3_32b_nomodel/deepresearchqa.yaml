@@ -1,5 +1,4 @@
 # Deep Reasoner — DeepSearchQA, Qwen3-32B, no models, 1 GPU
-# Converted 1:1 from the paper's configs/main/qwen3_32b_nomodel/qwen3_32b_deepsearchqa_nomodel.yaml (dolores.experiment format).
 #   python -m dolores.unified run --config configs/deep_reasoner/qwen3_32b_nomodel/deepresearchqa.yaml
 #   bash scripts/sbatch_runs.sh --configs configs/deep_reasoner/qwen3_32b_nomodel/deepresearchqa.yaml
 #

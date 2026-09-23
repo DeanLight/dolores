@@ -1,3 +1,0 @@
-# Baseline agent runners: cot, react, codeact, rlm, deepresearch (smolagents-style).
-# DeepReasoner YAML experiment runner + Cyclopts CLIs live in ``dolores`` (`src/dolores/`), not here.
-# Each module is also executable: python -m baselines.react --benchmark ...

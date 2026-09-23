@@ -1,4 +1,4 @@
-# react on synthworlds, Llama-3.3-70B — mirrors the pre-token-matched baseline run.
+# react on synthworlds, Llama-3.3-70B — the paper's baseline run.
 # No token matching: no budget, one attempt per task, default turn cap.
 
 _compose:

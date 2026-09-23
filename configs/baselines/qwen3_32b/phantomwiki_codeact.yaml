@@ -1,4 +1,4 @@
-# codeact on phantomwiki, Qwen3-32B — mirrors the pre-token-matched baseline run.
+# codeact on phantomwiki, Qwen3-32B — the paper's baseline run.
 # No token matching: no budget, one attempt per task, default turn cap.
 
 _compose:

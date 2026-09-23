@@ -12,10 +12,8 @@ packages = [
     "dolores.unified.benchmarks",
     "dolores.unified.benchmarks.open_deep_research",
     "dolores.unified.benchmarks.open_deep_research.scripts",
-    "baselines",
-    "benchmarks",
 ]
-py-modules = ["config", "core", "prompts", "vllm_utils"]
+py-modules = ["config", "core", "prompts"]
 
 [tool.setuptools.package-data]
 "dolores.unified.benchmarks" = ["data/*.yaml"]
@@ -23,7 +21,7 @@ py-modules = ["config", "core", "prompts", "vllm_utils"]
 [project]
 name = "dolores"
 version = "0.1.0"
-description = "Dolores publication evaluation code, benchmarks, and DeepReasoner experiment harness"
+description = "Dolores publication evaluation code: Deep Reasoner, baselines, benchmarks and run harness"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 license = { text = "Apache-2.0" }
@@ -94,7 +92,9 @@ notebook_src_dirs = ["src", "analysis"]
 formats = "ipynb,py:percent"
 
 [tool.pytest.ini_options]
-testpaths = ["src"]
+# analysis/results.py, browse_benchmarks.py and rlm_analysis.py are notebooks over
+# real run logs and datasets, so only the analysis modules with unit tests are collected.
+testpaths = ["src", "analysis/runs.py", "analysis/token_matched.py"]
 python_files = ["*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]

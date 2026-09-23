@@ -1,5 +1,4 @@
 # Deep Reasoner — PhantomWiki, Llama3-70B, agent v03, size 500
-# Converted 1:1 from the paper's configs/main/llama3_70b/llama3_70b_phantomwiki_size500.yaml (dolores.experiment format).
 #   python -m dolores.unified run --config configs/deep_reasoner/llama3_70b/phantomwiki_size500.yaml
 #   bash scripts/sbatch_runs.sh --configs configs/deep_reasoner/llama3_70b/phantomwiki_size500.yaml
 #

@@ -1,4 +1,4 @@
-# rlm on oolong, Qwen3-8B — mirrors the pre-token-matched baseline run.
+# rlm on oolong, Qwen3-8B — the paper's baseline run.
 # No token matching: no budget, one attempt per task, default turn cap.#
 # NOTE: rlm runs oolong with no instructions today, so this config
 # sets none either — it mirrors the existing run rather than inventing a prompt.

@@ -26,10 +26,9 @@
 #
 # ## Per-benchmark wiring
 #
-# The paper's Deep Reasoner runs went through one runner per benchmark. Each gave
-# the planner specific tool names, which the planner prompts refer to by name, and
-# parsed and scored the answer its own way. `_dr_wiring`, `_parse` and `_score`
-# reproduce those runners:
+# Each benchmark gives the planner specific tool names, which the planner prompts
+# (`configs/agents/*.yaml`) refer to by name, and parses and scores the answer its
+# own way. `_dr_wiring`, `_parse` and `_score` hold that wiring:
 #
 # | benchmark | REPL tools / vars | `parsed` | `scores` (f1, em) |
 # |---|---|---|---|
@@ -39,7 +38,7 @@
 # | deepresearchqa | `search` = web-search sub-agent on the search model | raw answer | LLM judge, judge |
 #
 # A scoring or parsing failure records `None` (and a warning) instead of failing
-# the attempt, as the per-benchmark runners did.
+# the attempt.
 
 # %%
 from juplit import test
@@ -86,7 +85,7 @@ def _load_planner_cfg(agent_config, model_name, api_base, api_key, no_thinking, 
     """Load the planner YAML into deep_reasoner's MainConfig, applying cfg overrides.
 
     Uses deep_reasoner's own loader (``_compose`` relative to the YAML, the same
-    settings layer), exactly as the per-benchmark runners loaded it.
+    settings layer as the ``deep-reasoner`` CLI).
     """
     from deep_reasoner.cli_base import MainConfig
     from deep_reasoner.cli_utils import load_main_and_validate

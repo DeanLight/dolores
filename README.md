@@ -43,8 +43,3 @@ scripts/           # run.sh (one config, managed vLLM), sbatch_runs.sh + slurm_r
 analysis/          # Jupytext notebooks: paper tables (`results.py` via `runs.py`),
                    # token-matched aggregation (`token_matched.py`), RLM token accounting, benchmark browser
 ```
-
-Until the old-vs-new comparison has run, the legacy runners (`src/baselines/`, `src/benchmarks/`,
-`src/dolores/experiment.py` and `*_cli.py`, `configs/main/`, `configs/experiment_base/`,
-`scripts/run_baseline.sh`, `sbatch_baselines.sh`, `sbatch_eval.sh`) are still in the tree; they are
-being removed. Use the commands above.

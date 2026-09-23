@@ -1,5 +1,4 @@
 # Deep Reasoner — PhantomWiki, Qwen3-8B, agent v03, size 50
-# Converted 1:1 from the paper's configs/main/qwen3_8b/qwen3_8b_phantomwiki_size50.yaml (dolores.experiment format).
 #   python -m dolores.unified run --config configs/deep_reasoner/qwen3_8b/phantomwiki_size50.yaml
 #   bash scripts/sbatch_runs.sh --configs configs/deep_reasoner/qwen3_8b/phantomwiki_size50.yaml
 #

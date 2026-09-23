@@ -1,5 +1,4 @@
 # Deep Reasoner — SynthWorld, Qwen3-32B, decomposition instructions, 1 GPU
-# Converted 1:1 from the paper's configs/main/qwen3_32b_decomp/qwen3_32b_synthworld_decomp.yaml (dolores.experiment format).
 #   python -m dolores.unified run --config configs/deep_reasoner/qwen3_32b_decomp/synthworlds.yaml
 #   bash scripts/sbatch_runs.sh --configs configs/deep_reasoner/qwen3_32b_decomp/synthworlds.yaml
 #

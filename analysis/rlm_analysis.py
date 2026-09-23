@@ -79,7 +79,6 @@ from config import Paths
 # Point at any directory containing RLM saved JSONs.
 # Unified runs (python -m dolores.unified): <run_id>/result.json under
 #   <log_dir>/<benchmark>/rlm/<model>/  — the model id keeps its slash.
-# Legacy flat layout: <stem>.json
 LOG_DIR = Paths.LOGS_DIR / "oolong" / "rlm" / "Qwen" / "Qwen3-32B"
 
 def find_rlm_files(d: Path) -> list[Path]:

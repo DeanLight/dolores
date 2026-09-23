@@ -1,7 +1,0 @@
-batch_size: 32
-task_timeout: 600
-benchmark:
-  name: helloworld
-  key_limit_seed: 42
-  extra_params:
-    seed: 0

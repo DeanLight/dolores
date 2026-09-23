@@ -24,12 +24,8 @@ Each Deep Reasoner model directory holds one config per benchmark for the main
 table (`phantomwiki_size500`, `synthworlds`, `oolong`, `deepresearchqa`) plus
 `phantomwiki_size50` / `phantomwiki_size5000` (PhantomWiki universe-size results)
 and `synthworlds_v2` (a second planner version; the paper reports `synthworlds`,
-planner v1). Each Deep Reasoner config records the `configs/main/**` file it was
-converted from, with the same planner YAML, benchmark slice and vLLM flags.
-
-> The legacy runners (`python -m dolores.experiment`, `scripts/run_baseline.sh`)
-> are still in the tree for the old-vs-new comparison and will be removed; use the
-> commands below.
+planner v1). Each Deep Reasoner config pins its planner YAML
+(`configs/agents/`), benchmark slice and the exact vLLM flags it is served with.
 
 ## Setup
 
