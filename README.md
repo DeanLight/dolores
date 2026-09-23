@@ -8,20 +8,24 @@ Publication evaluation code, benchmarks, and experiment harness used in the pape
 
 ```text
 src/
-  dolores/         # YAML-driven experiment runner (`experiment.py`) and per-benchmark *_cli modules
-  baselines/       # Baseline agents (react, codeact, cot, rlm, deepresearch, …)
-  benchmarks/      # Benchmark implementations (synthworlds, phantomwiki, oolong, deepresearchqa, hello_world, …)
-  config.py        # Paths, RunContext, settings
-  core.py
-  prompts.py
-  vllm_utils.py
+  dolores/
+    unified/       # The run interface: `python -m dolores.unified run --config <yaml>`
+      agents/      #   react, codeact, rlm, deepresearch, cot, deep_reasoner
+      benchmarks/  #   phantomwiki, synthworlds, oolong, deepresearchqa, hello_world (+ majority@k / best@k)
+      cli.py runner.py obs.py inference.py token_matched.py
+  config.py        # Paths, settings
+  core.py          # attempt counting, subprocess pool
+  prompts.py       # baseline prompts, verbatim
 deep-reasoner/     # raw implementation of dolores and additional utilities
 configs/
-  agents/          # Agent YAML
-  experiment_base/ # Shared includes for experiments
-  main/            # Model / experiment matrix YAML
-scripts/           # Run helpers (e.g. baselines, Slurm / sbatch)
-analysis/          # Jupytext notebooks: aggregated results, tables, paper figures (`results.py`, …)
+  deep_reasoner/   # Deep Reasoner runs (per model, plus the decomp / nomodel ablations)
+  baselines/       # Baseline runs: benchmark x baseline, per model (composed from base/)
+  token_matched/   # Token-matched baseline runs: try-hard and sample-k arms
+  agents/          # Deep Reasoner planner configs
+scripts/           # run.sh (one config, managed vLLM), sbatch_runs.sh (SLURM), monitoring
+analysis/          # Jupytext notebooks: paper tables (`results.py`), token-matched aggregation, …
 ```
+
+Until the old-vs-new comparison has run, the legacy runners (`src/baselines/`, `src/benchmarks/`, `dolores.experiment`, `configs/main/`) are still in the tree; they are being removed.
 
 For concrete commands for reproducing runs in the paper (configs + scripts), see **[reproduction.md](reproduction.md)**.

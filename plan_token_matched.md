@@ -3,6 +3,33 @@
 > Planning document for this PR. It is deleted in the final commit, once the port lands
 > and `reproduction.md` is rewritten.
 
+## Status
+
+Implemented on this branch (commits 1–5 and 7 of the sequence below):
+
+- [x] shared modules + deps
+- [x] `dolores.unified` port — import-normalised diff against upstream `ed05708` is empty
+- [x] Deep Reasoner parity (§2b), per-task timeout
+- [x] configs: `baselines/` (42), `base/`, `token_matched/` (28), `deep_reasoner/` (29) + ratio CSV
+- [x] scripts: `run.sh`, `sbatch_runs.sh`, `slurm_run.sh` (new names; the legacy scripts stay until §6)
+- [x] analysis: `token_matched.py`, `runs.py`, `results.py` / `browse_benchmarks.py` / `rlm_analysis.py` on qa.json
+- [x] `reproduction.md`, README
+- [ ] **§10 numbers check — author, needs a GPU**
+- [ ] §6 delete the legacy paths (after §10), plus `analysis/dr_analysis.py`, which only reads
+      `dolores.experiment` output; then delete this plan
+
+Found while implementing:
+
+- The legacy Deep Reasoner runners (`dolores/*_cli.py`) do not run against the vendored
+  `deep-reasoner` (`run_cli()` signature mismatch — `TypeError` before any task). §10
+  therefore compares Deep Reasoner's unified runs against the published per-task logs,
+  not against a live legacy run.
+- Entry point is `python -m dolores.unified` (a package `__main__`): running `cli.py`
+  as `__main__` executed its test blocks in every parent and child process.
+- `configs/deep_reasoner/*/synthworlds_v2.yaml` (planner v02) is left out of the paper
+  table by default (`analysis/runs.py` `DR_EXCLUDE`); confirm v01 is what the paper reports.
+- `max_workers` now comes from each config (upstream's submit script forced 32).
+
 ## Goal
 
 Dolores gets **one** interface for every run, Deep Reasoner included: the unified
