@@ -1,7 +1,7 @@
 # Deep Reasoner — Oolong, Llama3-70B, agent v02, 4 GPUs
 # Converted 1:1 from the paper's configs/main/llama3_70b/llama3_70b_oolong.yaml (dolores.experiment format).
 #   python -m dolores.unified run --config configs/deep_reasoner/llama3_70b/oolong.yaml
-#   bash scripts/sbatch_baselines.sh --configs configs/deep_reasoner/llama3_70b/oolong.yaml
+#   bash scripts/sbatch_runs.sh --configs configs/deep_reasoner/llama3_70b/oolong.yaml
 #
 # max_steps 30 is the planner's max_iter (the MainConfig default the paper ran
 # with); vllm_args are the exact extra vLLM flags that run served the model with.

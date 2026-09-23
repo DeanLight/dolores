@@ -141,8 +141,10 @@ def _dsqa_search_tool(cfg, cfg_main, log_dir: Path):
     """The DeepSearchQA web-search sub-agent, on the search model.
 
     ``search_model_id`` (LiteLLM format) comes from the run config, else the planner
-    YAML, else the planner model; ``search_api_base`` defaults to the run's inference
-    endpoint; the key comes from ``search_api_key_env`` (default OPENAI_API_KEY).
+    YAML, else the planner model. ``search_api_base`` defaults to the run's inference
+    endpoint, and then the run's inference key is used; an explicit
+    ``search_api_base`` takes its key from ``search_api_key_env`` (default
+    OPENAI_API_KEY).
     """
     from deep_reasoner.deepreasoner import Func
 
@@ -154,9 +156,14 @@ def _dsqa_search_tool(cfg, cfg_main, log_dir: Path):
     search_model_id = (cfg.get("search_model_id")
                        or getattr(cfg_main, "search_model_id", None)
                        or cfg_main.model)
-    search_api_base = cfg.get("search_api_base") or cfg_main.client.base_url
-    key_env = cfg.get("search_api_key_env", "OPENAI_API_KEY")
-    search_api_key = os.getenv(key_env) or os.getenv("OPENAI_API_KEY") or ""
+    if cfg.get("search_api_base"):
+        search_api_base = cfg.get("search_api_base")
+        key_env = cfg.get("search_api_key_env", "OPENAI_API_KEY")
+        search_api_key = os.getenv(key_env) or os.getenv("OPENAI_API_KEY") or ""
+    else:
+        # Same server as the planner: send the key it serves with.
+        search_api_base = cfg_main.client.base_url
+        search_api_key = cfg.inference.client_kwargs().get("api_key") or ""
     lm = litellm_model(
         model_id=search_model_id,
         api_base=search_api_base,
@@ -321,7 +328,7 @@ def _stub_cfg(bench_name: str, **extras):
         def benchmark_name(cls) -> str:
             return bench_name
 
-    return AgentCfg(model="m", inference=OpenAIBackend(api_base="http://localhost:0/v1", api_key=""),
+    return AgentCfg(model="m", inference=OpenAIBackend(api_base="http://localhost:0/v1", api_key="run-key"),
                     benchmark=_Stub(), **extras)
 
 
@@ -388,6 +395,7 @@ def test_dr_wiring_deepresearchqa_search_subagent():
         assert tools["search"].description == _DSQA_SEARCH_DESCRIPTION
         assert seen["model_id"] == "hosted_vllm/Qwen/Qwen3-32B"
         assert seen["api_base"] == "http://localhost:9/v1"
+        assert seen["api_key"] == "run-key", "the run's own server needs the run's key"
         assert seen["run_logs_dir"] == "/tmp/run"
 
         # No search model in the run config -> fall back to the planner model.

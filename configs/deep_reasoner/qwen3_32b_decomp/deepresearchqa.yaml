@@ -1,7 +1,7 @@
 # Deep Reasoner — DeepSearchQA, Qwen3-32B, decomposition instructions, 1 GPU
 # Converted 1:1 from the paper's configs/main/qwen3_32b_decomp/qwen3_32b_deepsearchqa_decomp.yaml (dolores.experiment format).
 #   python -m dolores.unified run --config configs/deep_reasoner/qwen3_32b_decomp/deepresearchqa.yaml
-#   bash scripts/sbatch_baselines.sh --configs configs/deep_reasoner/qwen3_32b_decomp/deepresearchqa.yaml
+#   bash scripts/sbatch_runs.sh --configs configs/deep_reasoner/qwen3_32b_decomp/deepresearchqa.yaml
 #
 # max_steps 30 is the planner's max_iter (the MainConfig default the paper ran
 # with); vllm_args are the exact extra vLLM flags that run served the model with.

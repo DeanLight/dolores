@@ -5,7 +5,8 @@
 #   bash scripts/check_parallel.sh <path>
 #
 # <path> can be:
-#   - a task dir   (contains llm_calls.jsonl)  → detailed view for that task
+#   - a task dir   (contains llm_calls.jsonl, or the unified runner's calls.jsonl)
+#                                               → detailed view for that task
 #   - a run dir    (contains task subdirs)      → aggregate across all tasks in the run
 #   - a bench dir  (contains run subdirs)       → aggregate across all runs and tasks
 
@@ -39,14 +40,12 @@ def load_calls(jsonl_path):
     We fix this by walking the file in log order (which is chronological) and
     adding 86400s whenever a timestamp drops by more than 12 hours.
     """
-    calls = []
-    for line in Path(jsonl_path).read_text().splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        obj = json.loads(line)
-        if obj.get("event") == "llm.call":
-            calls.append(obj)
+    objs = [json.loads(line) for line in Path(jsonl_path).read_text().splitlines() if line.strip()]
+    calls = [obj for obj in objs if obj.get("event") == "llm.call"]
+    if not calls:
+        # Unified runner's calls.jsonl: no event key; the record carrying the
+        # response (and duration) is the call, else fall back to the token records.
+        calls = [o for o in objs if "response" in o] or [o for o in objs if "total_tokens" in o]
 
     # Apply midnight rollover fix in file order (= log order = chronological).
     offset = 0
@@ -174,15 +173,17 @@ def print_aggregate(task_stats):
 # ── main ──────────────────────────────────────────────────────────────────────
 
 root = Path(sys.argv[1])
-jsonl_files = sorted(root.rglob("llm_calls.jsonl"))
+LOG_NAMES = ("llm_calls.jsonl", "calls.jsonl")
+jsonl_files = sorted({p for name in LOG_NAMES for p in root.rglob(name)})
 
 if not jsonl_files:
-    print(f"No llm_calls.jsonl files found under {root}")
+    print(f"No llm_calls.jsonl / calls.jsonl files found under {root}")
     sys.exit(1)
 
 # Single task dir → detailed view
-if (root / "llm_calls.jsonl").exists():
-    calls = load_calls(root / "llm_calls.jsonl")
+own = [root / name for name in LOG_NAMES if (root / name).exists()]
+if own:
+    calls = load_calls(own[0])
     stats = analyse_task(calls)
     if stats:
         print_task_detail(root, stats)
