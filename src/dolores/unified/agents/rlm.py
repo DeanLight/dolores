@@ -23,6 +23,7 @@
 from juplit import test
 
 # %%
+import json
 from pathlib import Path
 from typing import Any
 
@@ -205,6 +206,11 @@ class RlmAgent(Agent):
         rlm = RLM(**rlm_kwargs)
         prompt = task.vars.get("document", "")
         result = rlm.completion(prompt=prompt, root_prompt=task.question)
+        # The full completion record (per-thread usage, trajectories) for
+        # analysis/rlm_analysis.py, as the paper's RLM runs saved it.
+        (log_dir / "result.json").write_text(
+            json.dumps(result.to_dict(), indent=2, ensure_ascii=False, default=str)
+        )
         return _unquote(result.response)
 
     def _parsed(self, answer: Any) -> Any:
