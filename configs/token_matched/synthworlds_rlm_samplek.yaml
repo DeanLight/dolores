@@ -1,0 +1,97 @@
+# synthworlds x rlm — SAMPLE-K (2 attempts per task, aggregated post hoc)
+#
+# k_b = 1.834 (Deep Reasoner total tokens / rlm total tokens per task
+# on synthworlds, Qwen3-32B), from analysis/dr_vs_baseline_token_ratios.csv.
+#
+# Run with:
+#   python -m dolores.unified run --config configs/token_matched/synthworlds_rlm_samplek.yaml
+
+# ── sample count ─────────────────────────────────────────────────────────────
+# ceil(k_b) = ceil(1.834) = 2 attempts, so this baseline's total spend
+# is at least what Deep Reasoner spent on this cell. Rounding up never
+# under-spends, which is the direction that keeps the comparison fair.
+# ── prompt ───────────────────────────────────────────────────────────────────
+# Verbatim SYNTHWORLDS_RLM_INSTRUCTIONS from prompts.py.
+# This is the benchmark half only: rlm's own RLM_SYSTEM_PROMPT still leads,
+# exactly as it does without a config.
+
+agent: rlm
+log_dir: logs/token_matched/samplek
+slurm:
+  gpus: 2
+  tensor_parallel: 2
+  cpus_per_task: 16
+model: Qwen/Qwen3-32B
+inference:
+  kind: openai
+  api_base: http://localhost:8555/v1
+  api_key: EMPTY
+benchmark:
+  name: synthworlds
+max_workers: 32
+max_steps: 75
+temperature: 0.8
+samples: 2
+instructions: |-
+  You are solving multi-hop questions over a corpus of documents about entities — people, places, countries, languages, organizations, etc You must reason entirely from retrieved documents to find the answer.
+
+  Your answer must be a short entity name or date (e.g. "Velthar", "28 July 1896", "Elara Windsong").
+
+  Here are some examples to understand how to use the tools available to you:
+
+  ---
+
+  ```repl
+  docs = retrieve_top_5(query="Starlight Gala founder")
+  print(docs[0])
+  ```
+
+  The Starlight Gala is an annual cultural festival and charity event held in Crystalreach It was founded in 1902 by Thessan Vaylen a philanthropist and patron of the arts The Gala raises funds for the Luminara Arts Foundation and features performances in music theatre and dance Crystalreach is a large city and port The Moonlit Gala is a different event Thessan Korr is a different person The Luminara Arts Foundation is an organization
+
+  ---
+
+  ```repl
+  docs = retrieve_top_5(query="Thessan Vaylen birthplace")
+  print(docs[0])
+  ```
+
+  Thessan Vaylen was born in Eldoria and later became a cultural organizer and philanthropist
+
+  ---
+
+  ```repl
+  docs = retrieve_top_5(query="Kirelle Beryndra")
+  print(docs[0])
+  print(docs[1])
+  ```
+
+  Kirelle Beryndra died in Windhollow Windhollow is a town in Draconis County within the sovereign state of Vanthelis
+
+  Doubla has been a friend of Kirelle Beryndra and together they conquered the literary world with their works in Velthar and association with the Verdantism movement.
+
+  ---
+
+  ```repl
+  docs = retrieve_top_5(query="Draconis County named after")
+  print(docs)
+  ```
+
+  '["Draconis County is a county in Vanthelis. It was established on 3 July 1862 and is named after the person Valendriel Oakshadow. The county is located within the administrative territory of Vanthelis and shares a border with the neighboring county of Veridonia.", "Vanthelis is a sovereign state and constitutional monarchy on the continent of Jorathia. Its capital is Stormhaven and the official language is Velthar.", "Veridonia is a county in Vanthelis. It was established on 15 August 1870 and is named after the person Orin Thallavar.", "Valendriel Oakshadow (born 1790, died 1855) was a military officer and statesperson who held the rank of general. He served in the Vanthelis armed forces during the Jorathian Wars.", "Oakshadow Barracks is a military installation in Stormhaven. It was named in honour of Valendriel Oakshadow and constructed in 1880."]'
+
+  ---
+
+  ```repl
+  docs = retrieve_top_5(query="Luminara River basin countries")
+  print(docs[0])
+  ```
+
+  The Luminara River flows through several countries including Thundra
+
+  ---
+
+  ```repl
+  docs = retrieve_top_5(query="Thalvyn Province named after")
+  print(docs)
+  ```
+
+  '["Thalvyn Province is in Thundra and is named after Caldris Veymont He spoke Velthar as his native language Thundra has Velthar as an official language Velestia is its capital Veymont Square is a park", "Thundra is a sovereign state and republic on the continent of Valtoria. The federal capital and largest city is Velestia. Velthar and Oranthor are official languages of Thundra.", "Caldris Veymont (born 2 March 1790, died 11 November 1855) was a diplomat and politician in Thundra. He spoke Kynthor and Velthar, with Velthar as his native language. He served as ambassador to Terrasylvia from 1830 to 1845.", "Velestia is a big city and the federal capital of Thundra. It is located on the Luminara River and was established in 1710.", "Veymont Square is a public park in Velestia named in honour of Caldris Veymont. It was opened in 1870."]'

@@ -1,0 +1,20 @@
+# Deep Reasoner — SynthWorld, Qwen3-8B, agent v01, 1 GPU
+#   python -m dolores.unified run --config configs/deep_reasoner/qwen3_8b/synthworlds.yaml
+#   bash scripts/sbatch_runs.sh --configs configs/deep_reasoner/qwen3_8b/synthworlds.yaml
+#
+# max_steps 30 is the planner's max_iter (the MainConfig default the paper ran
+# with); vllm_args are the exact extra vLLM flags that run served the model with.
+
+agent: deep_reasoner
+agent_config: configs/agents/synthworld.yaml
+version: synthworld_0.0.1
+model: Qwen/Qwen3-8B
+log_dir: logs/qwen3_8b_synthworld
+inference: {kind: openai, api_base: 'http://localhost:8555/v1', api_key: EMPTY}
+benchmark: {name: synthworlds}
+max_steps: 30
+max_workers: 100
+task_timeout: 14400
+vllm_args: [--enable-prefix-caching, --seed, '42', --reasoning-parser, qwen3]
+vllm_gpu_mem: 0.9
+slurm: {gpus: 1, tensor_parallel: 1, cpus_per_task: 8, mem: 200G, time: '16:00:00'}

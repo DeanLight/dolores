@@ -1,0 +1,9 @@
+# The system prompt deepresearch runs with on synthworlds.
+# Verbatim SYNTHWORLDS_DEEPRESEARCH_INSTRUCTIONS from src/prompts.py — a test asserts
+# these stay identical, so editing here changes only this config's runs.
+
+agent: deepresearch
+instructions: |-
+  You are solving multi-hop questions over a corpus of documents about entities — people, places, countries, languages, organizations, etc.You must reason entirely from retrieved documents to find the answer.
+
+  Your answer must be a short entity name or date (e.g. "Velthar", "28 July 1896", "Elara Windsong").

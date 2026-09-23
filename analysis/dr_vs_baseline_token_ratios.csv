@@ -1,0 +1,17 @@
+benchmark,baseline_method,dr_mean_total_tok_per_task,baseline_mean_total_tok_per_task,dr_over_baseline_x_increase,status
+deepresearchqa,react,102506.86,9962.62,10.289,ok
+deepresearchqa,codeact,102506.86,13967.08,7.339,ok
+deepresearchqa,deepresearch,102506.86,46794.73,2.191,ok
+deepresearchqa,rlm,102506.86,18003.32,5.694,ok
+oolong-real,react,1387682.86,,,not_run
+oolong-real,codeact,1387682.86,6784.13,204.549,ok
+oolong-real,deepresearch,1387682.86,,,not_run
+oolong-real,rlm,1387682.86,387297,3.583,ok
+synthworlds,react,44210.58,21496.79,2.057,ok
+synthworlds,codeact,44210.58,15885.93,2.783,ok
+synthworlds,deepresearch,44210.58,27909.39,1.584,ok
+synthworlds,rlm,44210.58,24106.94,1.834,ok
+phantomwiki_500_1,react,366577.28,24049.34,15.243,ok
+phantomwiki_500_1,codeact,366577.28,37158.84,9.865,ok
+phantomwiki_500_1,deepresearch,366577.28,13658.95,26.838,ok
+phantomwiki_500_1,rlm,366577.28,33882.08,10.819,ok

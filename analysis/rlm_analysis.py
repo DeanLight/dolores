@@ -77,9 +77,9 @@ from config import Paths
 from config import Paths
 
 # Point at any directory containing RLM saved JSONs.
-# Flat layout (oolong / phantomwiki / synthworlds): <stem>.json
-# Folder layout (deepresearchqa):                    <stem>/result.json
-LOG_DIR = Paths.LOGS_DIR / "oolong-real" / "rlm" / "Qwen-Qwen3-32B"
+# Unified runs (python -m dolores.unified): <run_id>/result.json under
+#   <log_dir>/<benchmark>/rlm/<model>/  — the model id keeps its slash.
+LOG_DIR = Paths.LOGS_DIR / "oolong" / "rlm" / "Qwen" / "Qwen3-32B"
 
 def find_rlm_files(d: Path) -> list[Path]:
     return sorted([Path(p) for p in glob.glob(str(d / "*.json"))]) \

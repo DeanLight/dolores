@@ -1,0 +1,224 @@
+# synthworlds x deepresearch — TRY HARD (uncapped turns, 3.2x this baseline's spend, don't give up)
+#
+# k_b = 1.584 (Deep Reasoner total tokens / deepresearch total tokens per task
+# on synthworlds, Qwen3-32B), from analysis/dr_vs_baseline_token_ratios.csv.
+#
+# Run with:
+#   python -m dolores.unified run --config configs/token_matched/synthworlds_deepresearch_try_hard.yaml
+
+# ── token budget ─────────────────────────────────────────────────────────────
+# 88,421 tokens = 2 x k_b x this baseline's 27,909 mean tokens per task,
+# i.e. twice the 44,211 Deep Reasoner spends here. Strictly more than
+# Deep Reasoner used, so the run cannot be called starved.
+# ── prompt ───────────────────────────────────────────────────────────────────
+# Verbatim SYNTHWORLDS_DEEPRESEARCH_INSTRUCTIONS from prompts.py, plus the don't-give-up
+# paragraph this arm adds.
+# Deep Research runs two prompts. `instructions` above is the short
+# orchestrator one; `subagent_instructions` below is SYNTHWORLDS_DEEPRESEARCH_REACT_INSTRUCTIONS
+# — the ReAct translation, and the substantive prompt for this cell.
+
+agent: deepresearch
+log_dir: logs/token_matched/try_hard
+slurm:
+  gpus: 1
+  tensor_parallel: 1
+  cpus_per_task: 8
+model: Qwen/Qwen3-32B
+inference:
+  kind: openai
+  api_base: http://localhost:8555/v1
+  api_key: EMPTY
+benchmark:
+  name: synthworlds
+max_workers: 8
+max_steps: 100000
+token_budget: 88421
+instructions: |-
+  You are solving multi-hop questions over a corpus of documents about entities — people, places, countries, languages, organizations, etc.You must reason entirely from retrieved documents to find the answer.
+
+  Your answer must be a short entity name or date (e.g. "Velthar", "28 July 1896", "Elara Windsong").
+
+  Do not give up. Keep decomposing the question into smaller sub-questions,
+  retrieving what each one needs, and verifying what you find. If a step fails or a
+  lead goes nowhere, try a different approach rather than answering from what you
+  already have. Only give a final answer once you have exhausted the avenues
+  available to you.
+subagent_instructions: |-
+  Here are some examples:
+
+  ---
+  Task: "Where was the founder of the Starlight Gala born?"
+
+  I need to find who founded the Starlight Gala, then find where that person was born.
+  Action:
+  {
+    "name": "retrieve_top_5",
+    "arguments": {"query": "Starlight Gala founder"}
+  }
+  Observation:
+  ["The Starlight Gala is an annual cultural festival and charity event held in Crystalreach. It was founded in 1902 by Thessan Vaylen, a philanthropist and patron of the arts. The Gala raises funds for the Luminara Arts Foundation and features performances in music, theatre and dance. It is documented in several reference works including the Arcane Version and Legendarium.", "Crystalreach is a big city and port on the continent of Jorathia. It serves as the capital of Nytheris, a sovereign state and constitutional monarchy. The city had its inception on 3 March 1455 and is known for its cultural institutions and maritime trade.", "The Moonlit Gala is a cultural celebration held annually in Verenthia. It was established in 1878 by Kael Dunsworth and features exhibitions of visual art and sculpture.", "Thessan Korr (born 12 September 1840 in Ashenmoor) was a composer and conductor. He was a citizen of Krestoria and spoke Valorean Tongue as his native language.", "The Luminara Arts Foundation is a nonprofit organization based in Crystalreach. It was established in 1895 and provides grants to emerging artists in the fields of painting, sculpture and music."]
+
+  The Starlight Gala was founded by Thessan Vaylen. Now I need to find where Thessan Vaylen was born.
+  Action:
+  {
+    "name": "retrieve_top_5",
+    "arguments": {"query": "Thessan Vaylen birthplace"}
+  }
+  Observation:
+  ["Thessan Vaylen (born 14 June 1870 in Eldoria; died 2 December 1940) was a philanthropist, patron of the arts and cultural organizer. He held citizenship of Nytheris and spoke Velthar and Kynthor. He founded the Starlight Gala in 1902 and served as its director until his death.", "Eldoria is a sovereign state and federal republic on the continent of Jorathia. Its capital and largest city is Thorngate. The state was founded on 22 August 1648 and its official languages are Velthar and Therian.", "Thessan Breywick (born 1 March 1903 in Luminara) was a diplomat and statesperson. She served as ambassador to Krestoria from 1940 to 1955.", "Vaylen House is a historical residence in Crystalreach. It was built in 1835 and served as the family seat of the Vaylen lineage until 1950.", "Thorngarden is a district in the city of Thorngate. It was established in 1780 and contains several museums and educational institutions."]
+
+  Thessan Vaylen was born in Eldoria.
+  Action:
+  {
+    "name": "final_answer",
+    "arguments": {"answer": "Eldoria"}
+  }
+
+  ---
+  Task: "After whom is the administrative territorial entity that contains the place where Kirelle Beryndra died named?"
+
+  I need to find where Kirelle Beryndra died, then find which administrative entity contains that place, and finally find who it is named after.
+  Action:
+  {
+    "name": "retrieve_top_5",
+    "arguments": {"query": "Kirelle Beryndra"}
+  }
+  Observation:
+  ["Kirelle Beryndra (born 7 October 1814 in Ashenmoor; died 22 March 1879 in Windhollow) was a female writer and poet. She wrote in Velthar and was associated with the Verdantism literary movement. Her notable works include The Ember Requiem and Whispers of the Pale Shore.", "Windhollow is a town and municipality in the province of Draconis County, within the sovereign state of Vanthelis. It is situated on the banks of the River Aethon and had a population of 12,400 as of the last census.", "Beryndra Cove is a coastal inlet on the continent of Jorathia. It is named after the Beryndra family and lies adjacent to the Solstice Gulf.", "Ashenmoor is a city in the province of Thalvyn, within the sovereign state of Nytheris. It was established on 5 June 1620 and is known for its ironworks and textile industry.", "Kirelle Montrose (born 1880, died 1945) was a painter and sculptor from Crystalreach. She studied at the Luminara Arts Academy and exhibited widely across Jorathia."]
+
+  Kirelle Beryndra died in Windhollow, which is in Draconis County. Now I need to find who Draconis County is named after.
+  Action:
+  {
+    "name": "retrieve_top_5",
+    "arguments": {"query": "Draconis County named after"}
+  }
+  Observation:
+  ["Draconis County is a county in Vanthelis. It was established on 3 July 1862 and is named after the person Valendriel Oakshadow. The county is located within the administrative territory of Vanthelis and shares a border with the neighboring county of Veridonia.", "Vanthelis is a sovereign state and constitutional monarchy on the continent of Jorathia. Its capital is Stormhaven and the official language is Velthar.", "Veridonia is a county in Vanthelis. It was established on 15 August 1870 and is named after the person Orin Thallavar.", "Valendriel Oakshadow (born 1790, died 1855) was a military officer and statesperson who held the rank of general. He served in the Vanthelis armed forces during the Jorathian Wars.", "Oakshadow Barracks is a military installation in Stormhaven. It was named in honour of Valendriel Oakshadow and constructed in 1880."]
+
+  Draconis County is named after Valendriel Oakshadow.
+  Action:
+  {
+    "name": "final_answer",
+    "arguments": {"answer": "Valendriel Oakshadow"}
+  }
+
+  ---
+  Task: "What language is spoken in the country that contains the basin of the Luminara River and is also the native language of the person after whom Thalvyn Province is named?"
+
+  I need to find which countries the Luminara River flows through, find who Thalvyn Province is named after and what language they spoke, then find the language that satisfies both conditions.
+  Action:
+  {
+    "name": "retrieve_top_5",
+    "arguments": {"query": "Luminara River basin countries"}
+  }
+  Observation:
+  ["The Luminara River is a river on the continent Valtoria. It flows through the countries Aetheria, Cyndrath, Galindora, Terrasylvia, Thundoria, Thundra, Talvoria Republic and Ventorix; these states also constitute its basin countries. The river empties into Solstice Bay.", "The River Aethon is a river on the continent Jorathia. It flows through Vanthelis, Nytheris and Keldoria.", "Solstice Bay is an adjacent sea of Mediterranean character on the continent of Valtoria. It serves as the drainage basin for the Luminara River and borders Thundra, Ventorix and Galindora.", "Aetheria is a sovereign state on the continent of Valtoria. Its capital is Aurelion and its official language is Oranthor.", "Cyndrath is a landlocked sovereign state and republic on the continent of Valtoria. Its capital is Thornveil and its official languages are Kynthor and Brithalon."]
+
+  The Luminara River flows through several countries including Thundra, Aetheria, Cyndrath, etc. Now I need to find who Thalvyn Province is named after.
+  Action:
+  {
+    "name": "retrieve_top_5",
+    "arguments": {"query": "Thalvyn Province named after"}
+  }
+  Observation:
+  ["Thalvyn Province is an administrative territory within Thundra. It was established on 19 April 1855 and is named after the person Caldris Veymont.", "Thundra is a sovereign state and republic on the continent of Valtoria. The federal capital and largest city is Velestia. Velthar and Oranthor are official languages of Thundra.", "Caldris Veymont (born 2 March 1790, died 11 November 1855) was a diplomat and politician in Thundra. He spoke Kynthor and Velthar, with Velthar as his native language. He served as ambassador to Terrasylvia from 1830 to 1845.", "Velestia is a big city and the federal capital of Thundra. It is located on the Luminara River and was established in 1710.", "Veymont Square is a public park in Velestia named in honour of Caldris Veymont. It was opened in 1870."]
+
+  Thalvyn Province is in Thundra (a basin country of the Luminara River) and is named after Caldris Veymont, whose native language is Velthar. Thundra is indeed a basin country of the Luminara River and Velthar is an official language there. Both conditions are satisfied.
+  Action:
+  {
+    "name": "final_answer",
+    "arguments": {"answer": "Velthar"}
+  }
+
+  ---
+  Task: "In which town is the headquarters of the university where the owner of the firm representing Viorelle Marisol Kensington was educated?"
+
+  I need to find the firm that represents Viorelle Marisol Kensington, then its owner, then where that owner was educated, then the headquarters location of that university.
+  Action:
+  {
+    "name": "retrieve_top_5",
+    "arguments": {"query": "Viorelle Marisol Kensington"}
+  }
+  Observation:
+  ["Viorelle Marisol Kensington (born 6 February 2007 in Havencrest) is a jewelry designer and university teacher. Her given name is Viorelle, and she works as a designer with a specialization in jewelry and jewelry design. She is represented by Fundora Ventures.", "Havencrest is a municipality and town in Krestoria. It is situated on the coast of the Solstice Gulf and was established in 1802.", "Viorelle Ashcrest (born 1995 in Luminara) is a textile artist and weaver. She studied at the Luminara Arts Academy and speaks Tethyrian.", "Kensington Gallery is an art gallery in Crystalreach. It specializes in contemporary jewelry and decorative arts.", "Fundora Ventures is a business specializing in jewelry and jewelry design. The company was founded in 2032 by Xandria Fundora; they continue to own the business. Fundora Ventures represents a roster of individuals, including Viorelle Marisol Kensington, Farenth José and Grelyn Maynard."]
+
+  Viorelle is represented by Fundora Ventures, which is owned by Xandria Fundora. Now I need to find where Xandria Fundora was educated.
+  Action:
+  {
+    "name": "retrieve_top_5",
+    "arguments": {"query": "Xandria Fundora educated university"}
+  }
+  Observation:
+  ["Xandria Fundora (born 1989) is a jewelry designer, exhibition curator and university teacher whose work focuses on jewelry and jewelry design. Fundora studied at Velocitopia University from 2005 to 2008. He founded Fundora Ventures in 2032.", "Velocitopia University is a public research university headquartered in Spokevale, a cycling city and municipality in the country of Krestoria. The university traces its inception to 1675 and was founded by Aelynd Shakir.", "Spokevale is a cycling city and municipality in Krestoria. It is known for its university district and was established in 1590.", "Fundora Gallery is an exhibition space in Havencrest operated by Xandria Fundora since 2020.", "Aelynd Shakir (born 1640, died 1710) was a scholar and educator who founded Velocitopia University in 1675. He was a citizen of Krestoria and spoke Valorean Tongue."]
+
+  Xandria Fundora studied at Velocitopia University, which is headquartered in Spokevale.
+  Action:
+  {
+    "name": "final_answer",
+    "arguments": {"answer": "Spokevale"}
+  }
+
+  ---
+  Task: "Braxton Kytarathian Xylanthius's native language is indigenous to a place that has diplomatic relations with the country Olvyn Mccartney has allegiance to. Of which initiative is that place a member?"
+
+  I need to find Braxton's native language, then where that language is indigenous, and separately find which country Olvyn Mccartney has allegiance to. Then I need to find the place where the language is indigenous that also has diplomatic relations with Olvyn's country, and find which initiative that place belongs to.
+  Action:
+  {
+    "name": "retrieve_top_5",
+    "arguments": {"query": "Braxton Kytarathian Xylanthius native language"}
+  }
+  Observation:
+  ["Braxton Kytarathian Xylanthius (given name Braxton) was a male monarch and politician whose work spanned governance, military art and politics. He was born on 4 November 1689 and died on 19 March 1753. He spoke Valorean Tongue as his native language and also spoke Kynthor.", "Kytarathian is a noble family name associated with several monarchs and politicians across Jorathia and Nystoria.", "Xylanthius Manor is a historical estate on the continent of Nystoria. It served as the ancestral seat of the Xylanthius dynasty from 1550 to 1820.", "Braxton Veldryn (born 1710, died 1789) was a military officer who served as a general in the Thundra armed forces. He spoke Velthar and Oranthor.", "Valorean Tongue is a modern natural language currently in use. It is indigenous to Krestoria and the city of Ostreia Citadel, and it is spoken in the countries Krestoria, Kryndor and Mystralyn."]
+
+  Braxton's native language is Valorean Tongue, which is indigenous to Krestoria. Now I need to find Olvyn Mccartney's allegiance.
+  Action:
+  {
+    "name": "retrieve_top_5",
+    "arguments": {"query": "Olvyn Mccartney allegiance"}
+  }
+  Observation:
+  ["Olvyn Mccartney was a Xandoria statesperson who served as a monarch and politician. He held the rank of vizier from 2001 to 2014 and his allegiance and country of citizenship were to Xandoria. He was born in 1960 and died in 2020.", "Xandoria is a country, a kingdom and a sovereign state on the continent of Nystoria. It is situated on the Tioran physical feature and lies next to the Solstice Gulf. Its capital is Dawnspire and its official language is Therian.", "Mccartney Hall is a government building in Dawnspire, Xandoria. It was constructed in 1880 and serves as the seat of the vizier.", "Olvyn Brask (born 1975) is a politician from Krestoria who served in the Global Harmony Assembly from 2010 to 2022.", "The vizier is a governmental position in Xandoria established in 1750. It applies to the jurisdiction of Xandoria and carries executive authority."]
+
+  Olvyn Mccartney's allegiance is to Xandoria. Now I need to confirm that Krestoria has diplomatic relations with Xandoria and find which initiative Krestoria is a member of.
+  Action:
+  {
+    "name": "retrieve_top_5",
+    "arguments": {"query": "Krestoria diplomatic relations member initiatives"}
+  }
+  Observation:
+  ["Krestoria is a sovereign state and republic on the continent of Nystoria. Its capital is Ostreia Citadel and its official language is Valorean Tongue. Diplomatic relations have been established with Aetheria, Luminara State, Thundra, Xandoria and Mystralyn. Krestoria is a member of the EfficientCrossing Initiative, the Global Harmony Assembly and the Cooperative Prosperity Bank.", "Ostreia Citadel is the capital city of Krestoria. It is a port city on the coast of the Solstice Gulf and was founded in 1420.", "The EfficientCrossing Initiative is an expedited border crossing scheme, a government-financed program and a visa policy. Members include Cynthera, Krestoria and Thundra.", "The Global Harmony Assembly is an international organization with headquarters in Verenthia. Its members include Krestoria, Xandoria, Thundra and Aetheria.", "Mystralyn is a sovereign state on the continent of Nystoria. Its capital is Silverpeak and its official languages are Valorean Tongue and Therian."]
+
+  Krestoria has diplomatic relations with Xandoria (confirmed). Krestoria is a member of the EfficientCrossing Initiative.
+  Action:
+  {
+    "name": "final_answer",
+    "arguments": {"answer": "EfficientCrossing Initiative"}
+  }
+
+  ---
+  Task: "Who is the head of state of the country whose capital is the city where Sisters of the Eternal Flame was formed and who is also a relative of Zylara Stoker's sponsor?"
+
+  I need to find where the Sisters of the Eternal Flame was formed, find which country has that city as its capital, find who Zylara Stoker's sponsor is, and then find the head of state who is also a relative of that sponsor.
+  Action:
+  {
+    "name": "retrieve_top_5",
+    "arguments": {"query": "Sisters of the Eternal Flame founded formed"}
+  }
+  Observation:
+  ["Sisters of the Eternal Flame is an order of knighthood for women. It was founded in 1831 in Verenthia. The order was established by Ulwen Quintero and is named after Eldric Darkmoorstone. Among the order's internal grades is the Daughters of the Radiant Shield.", "Verenthia is a city and national capital that serves as the capital of Carthoria, a historical country. It is also a municipality of a sovereign state and a tourist destination. The city is located on the continent Jorathia.", "Ulwen Quintero (born 1795, died 1860) was a noblewoman and philanthropist from Carthoria. She founded several charitable and chivalric orders during her lifetime.", "The Daughters of the Radiant Shield is an internal grade within the Sisters of the Eternal Flame. It was established in 1835 and is awarded for service to the order.", "Eldric Darkmoorstone (born 1780, died 1850) was a military commander and national hero of Carthoria. Several institutions and honours bear his name."]
+
+  Sisters of the Eternal Flame was formed in Verenthia, which is the capital of Carthoria. Now I need to find Zylara Stoker's sponsor.
+  Action:
+  {
+    "name": "retrieve_top_5",
+    "arguments": {"query": "Zylara Stoker sponsor"}
+  }
+  Observation:
+  ["Zylara Stoker (baptized 6 June 1638; born 1638, died 7 August 1699) was a male artist and painter from Umbermist. He worked in styles associated with the Verdantism movement and spoke Kynthor. His sponsor was Joryn Prosser, a monarch and art collector.", "Joryn Prosser (born 8 April 1644, died 17 September 1704) was a male monarch, ruler, politician and art collector. He held multiple noble titles and received the Celestial Knightly Grade. His relatives include Nythor Cleaning, Thessan Vaylen and Eldrin Prosser. He served as head of state of Carthoria from 1670 to 1704.", "Umbermist is a town in Carthoria on the continent of Jorathia. It is known as a centre for painting and the visual arts.", "Verdantism is an art movement that originated in Carthoria in the early 17th century. It emphasized naturalistic depictions of landscape and light.", "Eldrin Prosser (born 1670, died 1730) was a prince and diplomat from Carthoria. He served as ambassador to Keldoria from 1700 to 1725."]
+
+  Zylara Stoker's sponsor was Joryn Prosser. Joryn Prosser served as head of state of Carthoria (whose capital is Verenthia where the order was formed) and his relatives include Nythor Cleaning. So the answer is the head of state of Carthoria who is also a relative of Joryn Prosser — that is Nythor Cleaning.
+  Action:
+  {
+    "name": "final_answer",
+    "arguments": {"answer": "Nythor Cleaning"}
+  }

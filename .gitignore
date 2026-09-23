@@ -164,3 +164,7 @@ benchmarks/benchmarks/synthworlds/data/
 .claude/
 logs/
 logs_orig/
+
+# SynthWorlds SM retrieval embeddings — built by scripts/build_synthworlds_embeddings.py
+src/dolores/unified/benchmarks/data/sm.npy
+src/dolores/unified/benchmarks/data/sm_docs.json

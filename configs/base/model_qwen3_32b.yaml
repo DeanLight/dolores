@@ -1,0 +1,7 @@
+# Qwen3-32B on a local vLLM server. Composed by the run configs.
+
+model: Qwen/Qwen3-32B
+inference:
+  kind: openai
+  api_base: http://localhost:8555/v1
+  api_key: EMPTY

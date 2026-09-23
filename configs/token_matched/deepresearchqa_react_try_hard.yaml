@@ -1,0 +1,40 @@
+# deepresearchqa x react — TRY HARD (uncapped turns, 20.6x this baseline's spend, don't give up)
+#
+# k_b = 10.289 (Deep Reasoner total tokens / react total tokens per task
+# on deepresearchqa, Qwen3-32B), from analysis/dr_vs_baseline_token_ratios.csv.
+#
+# Run with:
+#   python -m dolores.unified run --config configs/token_matched/deepresearchqa_react_try_hard.yaml
+
+# ── token budget ─────────────────────────────────────────────────────────────
+# 205,014 tokens = 2 x k_b x this baseline's 9,963 mean tokens per task,
+# i.e. twice the 102,507 Deep Reasoner spends here. Strictly more than
+# Deep Reasoner used, so the run cannot be called starved.
+# ── prompt ───────────────────────────────────────────────────────────────────
+# No instructions, by design: per the author's provenance table, react on
+# deepresearchqa runs on smolagents' default. That is a deliberate choice, not a gap,
+# so this arm adds only the don't-give-up paragraph below.
+
+agent: react
+log_dir: logs/token_matched/try_hard
+slurm:
+  gpus: 1
+  tensor_parallel: 1
+  cpus_per_task: 8
+model: Qwen/Qwen3-32B
+inference:
+  kind: openai
+  api_base: http://localhost:8555/v1
+  api_key: EMPTY
+benchmark:
+  name: deepresearchqa
+  seed: 42
+max_workers: 8
+max_steps: 100000
+token_budget: 205014
+instructions: |-
+  Do not give up. Keep decomposing the question into smaller sub-questions,
+  retrieving what each one needs, and verifying what you find. If a step fails or a
+  lead goes nowhere, try a different approach rather than answering from what you
+  already have. Only give a final answer once you have exhausted the avenues
+  available to you.

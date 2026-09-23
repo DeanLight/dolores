@@ -1,0 +1,73 @@
+int_prompt: |
+  You are an answer extractor.
+
+  You will receive:
+  - a question
+  - the raw output of a language model that attempted to answer it
+
+  Extract the final integer answer from the model output.
+
+  The model output may contain the final answer inside a \boxed{} expression. If so, extract only the value inside \boxed{} and do not include the \boxed{} markup.
+
+  Return only the integer.
+
+  Examples:
+
+  Question: How many rolls occurred in the episode?
+  Model output: Let me count each roll... I found 17 natural 20s and 8 natural 1s, giving a total of \boxed{114} rolls.
+  Answer: 114
+
+  Question: How many cantrips were cast?
+  Model output: After reviewing all episodes, the total cantrip count is approximately 25. Final answer: 25
+  Answer: 25
+
+str_prompt: |
+  You are an answer extractor.
+
+  You will receive:
+  - a question
+  - the raw output of a language model that attempted to answer it
+
+  Extract the final answer string from the model output.
+
+  The model output may contain the final answer inside a \boxed{} expression. If so, extract only the value inside \boxed{} and do not include the \boxed{} markup.
+
+  Return only the string.
+
+  Examples:
+
+  Question: What is the most frequently cast spell?
+  Model output: Looking through the transcript, the most frequently cast spell is \boxed{Fire Bolt} with 12 casts.
+  Answer: Fire Bolt
+
+  Question: Which spell appears most often?
+  Model output: Based on my analysis, the answer is Dispel Magic. It appears 7 times.
+  Answer: Dispel Magic
+
+list_prompt: |
+  You are an answer extractor.
+
+  You will receive:
+  - a question
+  - the raw output of a language model that attempted to answer it
+
+  Extract the list of answer strings from the model output.
+
+  The model output may contain the final answer inside a \boxed{} expression. If so, extract only the values inside \boxed{} and do not include the \boxed{} markup.
+
+  Return a list of strings.
+
+  Examples:
+
+  Question: Which spells were cast?
+  Model output: The unique spells cast are \boxed{Dispel Magic, Fire Bolt, Healing Word}
+  Answer: ["Dispel Magic", "Fire Bolt", "Healing Word"]
+
+  Question: Which skills were used?
+  Model output: The transcript shows several rolls, including Perception, Stealth, and Athletics.
+  Answer: ["Perception", "Stealth", "Athletics"]
+
+user_template: |-
+  Question: {question}
+
+  Model output: {prediction}

@@ -1,0 +1,11 @@
+# deepresearch on deepresearchqa, Qwen3-32B — the paper's baseline run.
+# No token matching: no budget, one attempt per task, default turn cap.#
+# NOTE: deepresearch runs deepresearchqa with no instructions today, so this config
+# sets none either — it mirrors the existing run rather than inventing a prompt.
+
+_compose:
+- configs/base/model_qwen3_32b.yaml
+- configs/base/benchmark_deepresearchqa.yaml
+agent: deepresearch
+max_steps: 75
+max_workers: 8

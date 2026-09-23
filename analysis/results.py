@@ -26,88 +26,49 @@ from juplit import test
 save = False
 
 # %%
-import glob
-import json
+import os
+
 import pandas as pd
-from benchmarks import phantomwiki
-from config import RunContext, Paths
+from datasets import load_dataset
 
-# %%
-# Paper-table column order; missing entries render as "-".
+from config import Paths
+from dolores.unified.benchmarks import DeepResearchQA, Oolong, PhantomWiki, SynthWorlds
+from analysis.runs import load_results, paper_configs, save_field
 
-def latex_rows(df, metric, digits=3, extra=()):
-    """Print one LaTeX-formatted row per (model, *extra) combo, methods in ORDER."""
-    keys = ["model", *extra]
-    table = df.groupby([*keys, "method"])[metric].mean()
-    combos = df[keys].drop_duplicates().sort_values(keys).itertuples(index=False, name=None)
-    for combo in combos:
-        print(f"% {' / '.join(f'{k}={v}' for k, v in zip(keys, combo))}")
-        row = []
-        for m in ORDER:
-            try:
-                row.append(f"{table.loc[(*combo, m)]:.{digits}f}")
-            except KeyError:
-                row.append("-")
-        print(" & ".join(row))
+# %% [markdown]
+# Every result below is read from the unified runs' `qa.json` files, located
+# through the run configs that produced them (`analysis/runs.py`): the paper's
+# baselines under `configs/baselines/<model>/`, Deep Reasoner under
+# `configs/deep_reasoner/<model>/`. Answers are rescored here from what each run
+# recorded, as the paper's tables were.
 
 # %% [markdown]
 # ## PhantomWiki
 
 # %%
-models = [
-    "Qwen/Qwen3-8B",
-    "Qwen/Qwen3-32B",
-    "meta-llama/Llama-3.3-70B-Instruct",
-]
-
-configs = [(50, 1), (500, 1), (5000, 1)]
-
-# %% [markdown]
-# ### Load scores
-
-# %%
-methods = {
-    # label          slug             glob pattern         models
-    "ReAct":        ("react",        "*.json",        models),
-    "CodeAct":      ("codeact",      "*.json",        models),
-    "Deep Research": ("deepresearch", "*/result.json", ["hosted_vllm/"+model for model in models]),
-    "Deep Reasoner (ours)": ("deepreasoner", "*/qa.json", models),
-    "RLM":          ("rlm",           "*.json", models),
-}
+def _phantom_prediction(row):
+    """The parsed entity list when the run recorded one, else the raw answer."""
+    parsed = row.get("parsed")
+    return parsed if isinstance(parsed, list) else row.get("answer")
 
 # %%
 if test():
     rows = []
-    for method_label, (method_slug, glob_pat, method_models) in methods.items():
-        for model in method_models:
-            for size, seed in configs:
-                benchmark = f"phantomwiki_{size}_{seed}"
-                log_dir = RunContext.get_log_dir(benchmark, method_slug, model)
-                for file in glob.glob(f"{log_dir}/{glob_pat}"):
-                    with open(file) as f:
-                        data = json.load(f)
-                    test_id = data.get("test_id") or data.get("example_id") or data.get("task_id")
-                    answer = data.get("parsed") or data.get("parsed_output") or []
-                    f1, em = phantomwiki.score(size, seed, test_id, answer)
-
-                    model_str = model.split("/")[-1]
-                    if data.get("no_thinking") and not model_str.endswith("-nothink"):
-                        model_str += "-nothink"
-
-                    if save:
-                        data["score"] = f1
-                        with open(file, "w") as f:
-                            json.dump(data, f, indent=2, ensure_ascii=False)
-
-                    rows.append({
-                        "method":  method_label,
-                        "model":   model_str,
-                        "size":    size,
-                        "seed":    seed,
-                        "test_id": test_id,
-                        "f1":      f1,
-                        "em":      em,
-                    })
+    for cfg_path in paper_configs("phantomwiki"):
+        for r in load_results(cfg_path):
+            size, seed = r["benchmark"]["size"], r["benchmark"]["seed"]
+            f1, em = PhantomWiki(size=size, seed=seed).score(r["task_id"], _phantom_prediction(r))
+            if save:
+                save_field(r, score=f1)
+            rows.append({
+                "method":  r["method"],
+                "model":   r["model"],
+                "size":    size,
+                "seed":    seed,
+                "test_id": r["task_id"],
+                "f1":      f1,
+                "em":      em,
+            })
 
     df_pw = pd.DataFrame(rows)
     print(f"{len(df_pw)} scored examples across {df_pw['method'].nunique()} methods, {df_pw['model'].nunique()} models")
@@ -121,69 +82,51 @@ if test():
 # # Oolong
 
 # %%
-import re
-from benchmarks import oolong
-from config import RunContext
-import glob
-import json
-from functools import partial
-import pandas as pd
+def exp_penalty(gold, pred):
+    """Oolong's original numeric scorer: 0.75 ** |error|."""
+    return 0.75 ** abs(gold - pred)
 
 # %%
 if test():
-    ds = oolong._load_dataset()
+    oolong = Oolong(limit=500, seed=42)
+    ds = Oolong._score_index()
 
 # %% [markdown]
 # ## Load scores
+#
+# Deep Reasoner records the LLM-parsed typed answer at run time. The baseline
+# agents record the raw answer, so it is LLM-parsed here (needs `OPENAI_API_KEY`)
+# and cached in its qa.json as `oolong_parsed`, once.
 
 # %%
-benchmark = "oolong-real"
-
-# List of tuples (not a dict!) so the same method label can appear with multiple models.
-oolong_methods = [
-    # label           slug             glob pattern  model
-    ("Deep Reasoner (ours)", "deepreasoner",  "*/qa.json",   "meta-llama/Llama-3.3-70B-Instruct"),
-    ("Deep Reasoner (ours)", "deepreasoner",  "*/qa.json",   "Qwen/Qwen3-32B"),
-    ("Deep Reasoner (ours)", "deepreasoner",  "*/qa.json",   "Qwen/Qwen3-8B"),
-    ("RLM",          "rlm",           "*.json",     "meta-llama/Llama-3.3-70B-Instruct"),
-    ("RLM",          "rlm",           "*.json",     "Qwen/Qwen3-32B"),
-    # ("RLM",          "rlm",           "*.json",     "Qwen/Qwen3-32B-nothink"),
-    ("RLM",          "rlm",           "*.json",     "Qwen/Qwen3-8B"),
-    ("CodeAct",     "codeact",       "*.json",     "Qwen/Qwen3-8B"),
-    ("CodeAct",      "codeact",       "*.json",     "Qwen/Qwen3-32B"),
-    ("CodeAct",      "codeact",       "*.json",     "meta-llama/Llama-3.3-70B-Instruct"),
-]
+def _oolong_prediction(row):
+    if row["agent"] == "deep_reasoner":
+        return row.get("parsed")
+    if "oolong_parsed" in row:
+        return row["oolong_parsed"]
+    try:
+        pred = oolong.parse(row["task_id"], str(row.get("answer", "")),
+                            api_key=os.environ["OPENAI_API_KEY"])
+    except Exception as exc:
+        print(f"parse failed for {row['task_id']}: {exc}")
+        return None
+    save_field(row, oolong_parsed=pred)
+    return pred
 
 # %%
 if test():
     rows = []
-    for method_label, method_slug, glob_pat, model in oolong_methods:
-        log_dir = RunContext.get_log_dir(benchmark, method_slug, model)
-        for file in glob.glob(f"{log_dir}/{glob_pat}"):
-            with open(file) as f:
-                data = json.load(f)
-            ex_id = data.get("test_id") or data.get("example_id") or data.get("ex_id") or data.get("task_id")
-            ex = ds.get(ex_id, {})
+    for cfg_path in paper_configs("oolong"):
+        for r in load_results(cfg_path):
+            ex = ds.get(r["task_id"], {})
             episodes = ex.get("episodes") or []
-            answer = data.get("parsed") or data.get("parsed_output")
-
-            model_str = model.split("/")[-1]
-            if data.get("no_thinking") and not model_str.endswith("-nothink"):
-                model_str += "-nothink"
-
-            if save:
-                s = oolong.score(ex_id, answer, scorer=oolong.relaxed_accuracy)
-                data["score"] = s
-                with open(file, "w") as f:
-                    json.dump(data, f, indent=2, ensure_ascii=False)
-
             rows.append({
-                "method":        method_label,
-                "model":         model_str,
-                "id":            ex_id,
+                "method":        r["method"],
+                "model":         r["model"],
+                "id":            r["task_id"],
                 "question_type": ex.get("question_type"),
                 "num_episodes":  len(episodes),
-                "prediction":    answer,
+                "prediction":    _oolong_prediction(r),
                 "gold_answer":   ex.get("answer"),
             })
 
@@ -199,8 +142,8 @@ def score(row, scorer=None):
 
 # %%
 if test():
-    df_oo["score"]         = df_oo.apply(lambda r: score(r, scorer=None),                    axis=1)
-    df_oo["score_relaxed"] = df_oo.apply(lambda r: score(r, scorer=oolong.relaxed_accuracy), axis=1)
+    df_oo["score"]         = df_oo.apply(lambda r: score(r, scorer=exp_penalty),                axis=1)
+    df_oo["score_relaxed"] = df_oo.apply(lambda r: score(r, scorer=Oolong._relaxed_accuracy), axis=1)
 
 # %%
 if test():
@@ -210,67 +153,29 @@ if test():
 # # SynthWorlds
 
 # %%
-from benchmarks import synthworlds
-
-benchmark = "synthworlds"
-
-# %%
 if test():
-    qa_index = synthworlds._load_qa_index()
+    synthworlds = SynthWorlds()
+    graph_type = {row["instance_id"]: row["question_graph_type"]
+                  for row in load_dataset("kenqgu/SynthWorlds", "qa-sm", split="test")}
 
 # %% [markdown]
 # ## Load scores
 
 # %%
-# List of tuples so the same method label can appear with multiple models.
-sw_methods = [
-    # label           slug             glob pattern      model
-    ("ReAct",        "react",         "*.json",         "Qwen/Qwen3-8B"),
-    ("ReAct",        "react",         "*.json",         "Qwen/Qwen3-32B"),
-    ("ReAct",        "react",         "*.json",         "meta-llama/Llama-3.3-70B-Instruct"),
-    ("CodeAct",      "codeact",       "*.json",         "Qwen/Qwen3-8B"),
-    ("CodeAct",      "codeact",       "*.json",         "Qwen/Qwen3-32B"),
-    # ("CodeAct",      "codeact",       "*.json",         "Qwen/Qwen3-32B-nothink"),
-    ("CodeAct",      "codeact",       "*.json",         "meta-llama/Llama-3.3-70B-Instruct"),
-    ("Deep Research", "deepresearch",  "*/result.json",  "hosted_vllm/Qwen/Qwen3-8B"),
-    ("Deep Research", "deepresearch",  "*/result.json",  "hosted_vllm/Qwen/Qwen3-32B"),
-    ("Deep Research", "deepresearch",  "*/result.json",  "hosted_vllm/meta-llama/Llama-3.3-70B-Instruct"),
-    ("RLM", "rlm",  "*.json",  "Qwen/Qwen3-8B"),
-    ("RLM", "rlm",  "*.json",  "Qwen/Qwen3-32B"),
-    ("RLM", "rlm",  "*.json",  "meta-llama/Llama-3.3-70B-Instruct"),
-    ("Deep Reasoner (ours)", "deepreasoner", "*/qa.json", "Qwen/Qwen3-8B"),
-    ("Deep Reasoner (ours)", "deepreasoner", "*/qa.json", "Qwen/Qwen3-32B"),
-    ("Deep Reasoner (ours)", "deepreasoner", "*/qa.json", "meta-llama/Llama-3.3-70B-Instruct"),
-]
-
-# %%
 if test():
     rows = []
-    for method_label, method_slug, glob_pat, model in sw_methods:
-        log_dir = RunContext.get_log_dir(benchmark, method_slug, model)
-        for file in glob.glob(f"{log_dir}/{glob_pat}"):
-            with open(file) as f:
-                data = json.load(f)
-            test_id = data.get("test_id") or data.get("example_id") or data.get("task_id")
-            answer = str(data.get("answer", ""))
-            #answer = data.get("answer") or ''
-            f1, em = synthworlds.score(test_id, answer)
-
-            model_str = model.split("/")[-1]
-            if data.get("no_thinking") and not model_str.endswith("-nothink"):
-                model_str += "-nothink"
-
+    for cfg_path in paper_configs("synthworlds"):
+        for r in load_results(cfg_path):
+            answer = str(r.get("answer", ""))
+            f1, em = synthworlds.score(r["task_id"], answer)
             if save:
-                data["score"] = f1
-                with open(file, "w") as f:
-                    json.dump(data, f, indent=2, ensure_ascii=False)
-
+                save_field(r, score=f1)
             rows.append({
-                "method":     method_label,
-                "model":      model_str,
-                "test_id":    test_id,
+                "method":     r["method"],
+                "model":      r["model"],
+                "test_id":    r["task_id"],
                 "answer":     answer,
-                "graph_type": qa_index[test_id]["graph_type"],
+                "graph_type": graph_type[r["task_id"]],
                 "f1":         f1,
                 "em":         em,
             })
@@ -283,70 +188,33 @@ if test():
 # # DeepSearchQA
 
 # %%
-from benchmarks import deepresearchqa
-
-benchmark = "DeepResearchQA"
+if test():
+    # Constructing DeepResearchQA checks for SERPER_API_KEY (web search); judging
+    # does not search, so any value will do here.
+    os.environ.setdefault("SERPER_API_KEY", "unused-for-judging")
+    deepresearchqa = DeepResearchQA()
+    dr_index = DeepResearchQA._index()
 
 # %% [markdown]
 # ## Load scores
 
 # %%
-# List of tuples so the same method label can appear with multiple models.
-drqa_methods = [
-    # label           slug             glob pattern      model
-    ("Deep Reasoner (ours)", "deepreasoner",  "*/qa.json",   "meta-llama/Llama-3.3-70B-Instruct"),
-    ("Deep Reasoner (ours)", "deepreasoner",  "*/qa.json",   "Qwen/Qwen3-32B"),
-    ("Deep Reasoner (ours)", "deepreasoner",  "*/qa.json",   "Qwen/Qwen3-8B"),
-    ("Deep Research", "deepresearch",  "*/result.json",  "hosted_vllm/Qwen/Qwen3-8B"),
-    ("Deep Research", "deepresearch",  "*/result.json",  "hosted_vllm/Qwen/Qwen3-32B"),
-    # ("Deep Research", "deepresearch",  "*/result.json",  "hosted_vllm/Qwen/Qwen3-32B-nothink"),
-    ("Deep Research", "deepresearch",  "*/result.json",  "hosted_vllm/meta-llama/Llama-3.3-70B-Instruct"),
-    ("RLM", "rlm",  "*/result.json",  "Qwen/Qwen3-8B"),
-    ("RLM", "rlm",  "*/result.json",  "Qwen/Qwen3-32B"),
-    ("RLM", "rlm",  "*/result.json",  "meta-llama/Llama-3.3-70B-Instruct"),
-    ("ReAct", "react",  "*/result.json",  "Qwen/Qwen3-8B"),
-    ("ReAct", "react",  "*/result.json",  "Qwen/Qwen3-32B"),
-    ("ReAct", "react",  "*/result.json",  "meta-llama/Llama-3.3-70B-Instruct"),
-    ("CodeAct", "codeact",  "*/result.json",  "Qwen/Qwen3-8B"),
-    ("CodeAct", "codeact",  "*/result.json",  "Qwen/Qwen3-32B"),
-    ("CodeAct", "codeact",  "*/result.json",  "meta-llama/Llama-3.3-70B-Instruct"),
-]
-
-# %%
 if test():
-    # Judge (once): for each (method, model), find files missing judge_score,
-    # batch-judge them, write judge_score + judge_reasoning back to disk.
-    # Skips files that already have judge_score (idempotent).
-    for method_label, method_slug, glob_pat, model in drqa_methods:
-        log_dir = RunContext.get_log_dir(benchmark, method_slug, model)
-
-        pending = []  # (path, data, test_id, answer)
-        for path in glob.glob(f"{log_dir}/{glob_pat}"):
-            with open(path) as f:
-                data = json.load(f)
-            if "judge_score" in data:
-                continue
-            test_id = data.get("test_id") or data.get("example_id") or data.get("task_id")
-            answer = data.get("answer", "")
-            pending.append((path, data, test_id, answer))
-
-        tag = f"[{method_label} / {model.split('/')[-1]}]"
+    # Judge (once): for each config, find runs missing judge_score, batch-judge
+    # them, write judge_score + judge_reasoning back into qa.json. Idempotent.
+    for cfg_path in paper_configs("deepresearchqa"):
+        pending = [r for r in load_results(cfg_path) if "judge_score" not in r]
+        tag = f"[{cfg_path}]"
         if not pending:
             print(f"{tag} nothing to judge")
             continue
-
-        print(f"{tag} judging {len(pending)} files...")
-        pairs = [(tid, ans) for _, _, tid, ans in pending]
-        results = deepresearchqa.score_judge_batch(pairs)
-        by_id = {tid: (score, reasoning) for tid, score, reasoning in results}
-
-        for path, data, tid, _ in pending:
-            score, reasoning = by_id[tid]
-            data["judge_score"] = score
-            data["judge_reasoning"] = reasoning
-            with open(path, "w") as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
-        print(f"{tag} wrote {len(pending)} files")
+        print(f"{tag} judging {len(pending)} runs...")
+        results = deepresearchqa.score_judge_batch([(r["task_id"], str(r.get("answer", ""))) for r in pending])
+        by_id = {tid: (s, reasoning) for tid, s, reasoning in results}
+        for r in pending:
+            s, reasoning = by_id[r["task_id"]]
+            save_field(r, judge_score=s, judge_reasoning=reasoning)
+        print(f"{tag} wrote {len(pending)} runs")
 
 # %%
 def em_score(answer, gold):
@@ -355,40 +223,24 @@ def em_score(answer, gold):
 # %%
 if test():
     rows = []
-    for method_label, method_slug, glob_pat, model in drqa_methods:
-        log_dir = RunContext.get_log_dir(benchmark, method_slug, model)
-        tag = f"[{method_label} / {model.split('/')[-1]}]"
-        for file in glob.glob(f"{log_dir}/{glob_pat}"):
-            with open(file) as f:
-                data = json.load(f)
-            test_id = data.get("test_id") or data.get("example_id") or data.get("task_id")
-            pred = data.get("answer", "")
-            gold = deepresearchqa.get_answer(test_id)
-            judge_score = data.get("judge_score")
-            judge_reasoning = data.get("judge_reasoning")
-
-            model_str = model.split("/")[-1]
-            if data.get("no_thinking") and not model_str.endswith("-nothink"):
-                model_str += "-nothink"
-
+    for cfg_path in paper_configs("deepresearchqa"):
+        for r in load_results(cfg_path):
+            pred = r.get("answer", "")
+            gold = dr_index[r["task_id"]]["answer"]
             if save:
-                data["score"] = judge_score
-                with open(file, "w") as f:
-                    json.dump(data, f, indent=2, ensure_ascii=False)
-
+                save_field(r, score=r.get("judge_score"))
             rows.append({
-                "method":       method_label,
-                "model":        model_str,
-                "test_id":      test_id,
+                "method":       r["method"],
+                "model":        r["model"],
+                "test_id":      r["task_id"],
                 "prediction":   pred,
                 "gold_answer":  gold,
-                "judge_score":  judge_score,
+                "judge_score":  r.get("judge_score"),
                 "em":           em_score(pred, gold),
             })
 
     df_drqa = pd.DataFrame(rows)
     df_drqa = df_drqa.drop_duplicates(subset=["method", "model", "test_id"], keep="last")
-
     print(f"\n{len(df_drqa)} scored examples across {df_drqa['method'].nunique()} methods, {df_drqa['model'].nunique()} models")
     df_drqa.groupby(["method", "model"]).size()
 
@@ -408,11 +260,8 @@ if test():
 # # Analysis
 
 # %%
-import glob
-import json
 import pandas as pd
-from benchmarks import phantomwiki
-from config import RunContext, Paths
+from config import Paths
 
 # %%
 if test():

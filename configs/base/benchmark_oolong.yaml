@@ -1,0 +1,6 @@
+# oolong benchmark selection. Composed by the run configs.
+
+benchmark:
+  name: oolong
+  limit: 500
+  seed: 42

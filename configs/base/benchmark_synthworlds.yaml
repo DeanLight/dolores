@@ -1,0 +1,4 @@
+# synthworlds benchmark selection. Composed by the run configs.
+
+benchmark:
+  name: synthworlds

@@ -1,0 +1,15 @@
+# Unified-CLI debug config — no dataset, no tools beyond pure Python functions.
+#   python -m dolores.unified run --config configs/debug_helloworld.yaml --task-id fib_7
+# Reserved keys (agent/model/benchmark/inference/max_steps/max_workers/
+# no_thinking/shuffle) are consumed by the framework; anything else flows into
+# the AgentCfg as an agent-specific extra.
+agent: cot
+model: Qwen/Qwen3-32B
+inference:
+  kind: openai
+  api_base: http://localhost:8555/v1
+  api_key: EMPTY
+benchmark:
+  name: hello_world
+max_steps: 8
+max_workers: 1

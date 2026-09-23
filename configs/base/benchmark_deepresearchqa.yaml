@@ -1,0 +1,5 @@
+# deepresearchqa benchmark selection. Composed by the run configs.
+
+benchmark:
+  name: deepresearchqa
+  seed: 42

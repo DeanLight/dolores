@@ -1,0 +1,34 @@
+# deepresearchqa x rlm — SAMPLE-K (6 attempts per task, aggregated post hoc)
+#
+# k_b = 5.694 (Deep Reasoner total tokens / rlm total tokens per task
+# on deepresearchqa, Qwen3-32B), from analysis/dr_vs_baseline_token_ratios.csv.
+#
+# Run with:
+#   python -m dolores.unified run --config configs/token_matched/deepresearchqa_rlm_samplek.yaml
+
+# ── sample count ─────────────────────────────────────────────────────────────
+# ceil(k_b) = ceil(5.694) = 6 attempts, so this baseline's total spend
+# is at least what Deep Reasoner spent on this cell. Rounding up never
+# under-spends, which is the direction that keeps the comparison fair.
+# ── prompt ───────────────────────────────────────────────────────────────────
+# No instructions, by design: per the author's provenance table, rlm on
+# deepresearchqa runs on rlm's default. That is a deliberate choice, not a gap.
+
+agent: rlm
+log_dir: logs/token_matched/samplek
+slurm:
+  gpus: 2
+  tensor_parallel: 2
+  cpus_per_task: 16
+model: Qwen/Qwen3-32B
+inference:
+  kind: openai
+  api_base: http://localhost:8555/v1
+  api_key: EMPTY
+benchmark:
+  name: deepresearchqa
+  seed: 42
+max_workers: 32
+max_steps: 75
+temperature: 0.8
+samples: 6
