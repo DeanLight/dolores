@@ -20,6 +20,13 @@ The config names the agent (`react`, `codeact`, `rlm`, `deepresearch` or
 `<model>` is one of `qwen3_8b`, `qwen3_32b`, `llama3_70b`. ReAct and Deep Research
 have no Oolong cell: its documents exceed their context window.
 
+Each Deep Reasoner model directory holds one config per benchmark for the main
+table (`phantomwiki_size500`, `synthworlds`, `oolong`, `deepresearchqa`) plus
+`phantomwiki_size50` / `phantomwiki_size5000` (PhantomWiki universe-size results)
+and `synthworlds_v2` (a second planner version; the paper reports `synthworlds`,
+planner v1). Each Deep Reasoner config records the `configs/main/**` file it was
+converted from, with the same planner YAML, benchmark slice and vLLM flags.
+
 > The legacy runners (`python -m dolores.experiment`, `scripts/run_baseline.sh`)
 > are still in the tree for the old-vs-new comparison and will be removed; use the
 > commands below.
@@ -89,7 +96,7 @@ bash scripts/sbatch_runs.sh --configs 'configs/baselines/qwen3_32b/*.yaml'     -
 ### Full
 
 ```bash
-# Deep Reasoner, one model at a time
+# Deep Reasoner, one model at a time (every config; see above for which feed the main table)
 bash scripts/sbatch_runs.sh --configs 'configs/deep_reasoner/qwen3_8b/*.yaml'
 bash scripts/sbatch_runs.sh --configs 'configs/deep_reasoner/qwen3_32b/*.yaml'
 bash scripts/sbatch_runs.sh --configs 'configs/deep_reasoner/llama3_70b/*.yaml'
@@ -102,6 +109,13 @@ bash scripts/sbatch_runs.sh --configs 'configs/deep_reasoner/qwen3_32b_nomodel/*
 bash scripts/sbatch_runs.sh --configs 'configs/baselines/qwen3_8b/*.yaml'
 bash scripts/sbatch_runs.sh --configs 'configs/baselines/qwen3_32b/*.yaml'
 bash scripts/sbatch_runs.sh --configs 'configs/baselines/llama3_70b/*.yaml'
+```
+
+To submit only the main-table Deep Reasoner runs for a model, name them
+(`--configs` takes several paths or globs):
+
+```bash
+bash scripts/sbatch_runs.sh --configs configs/deep_reasoner/qwen3_32b/{phantomwiki_size500,synthworlds,oolong,deepresearchqa}.yaml
 ```
 
 Without SLURM, run a config directly: `bash scripts/run.sh --config configs/deep_reasoner/qwen3_32b/oolong.yaml`.
@@ -165,7 +179,8 @@ Tables are written as CSVs under `logs/analysis/token_matched/`.
 
 - **`analysis/results.py`** (Jupytext `py:percent`) rebuilds the paper tables from
   the runs above: it finds each config's run tree (`analysis/runs.py`), rescores
-  the recorded answers and prints the LaTeX rows. The Oolong answer parse and the
+  the recorded answers and prints the LaTeX rows (Deep Reasoner SynthWorlds from
+  `synthworlds.yaml`, planner v1). The Oolong answer parse and the
   DeepSearchQA judge call OpenAI once per run and cache the result in its `qa.json`.
 - **`analysis/rlm_analysis.py`** — RLM token accounting from the `result.json`
   each RLM run saves (needs `transformers` for the tokenizers).

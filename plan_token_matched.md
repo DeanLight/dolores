@@ -26,8 +26,8 @@ Found while implementing:
   not against a live legacy run.
 - Entry point is `python -m dolores.unified` (a package `__main__`): running `cli.py`
   as `__main__` executed its test blocks in every parent and child process.
-- `configs/deep_reasoner/*/synthworlds_v2.yaml` (planner v02) is left out of the paper
-  table by default (`analysis/runs.py` `DR_EXCLUDE`); confirm v01 is what the paper reports.
+- The paper's SynthWorlds Deep Reasoner result is planner v1 (`synthworlds.yaml`, confirmed);
+  `synthworlds_v2.yaml` is kept as a config but left out of the paper table.
 - `max_workers` now comes from each config (upstream's submit script forced 32).
 
 ## Goal

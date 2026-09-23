@@ -15,7 +15,7 @@ longer used for evals, so they get no token-matched configs.
 | **sample-k** | `_samplek` | `⌈k_b⌉` independent attempts per task, all kept, aggregated post hoc into majority@k and best@k. |
 
 `k_b` = Deep Reasoner's total tokens ÷ this baseline's total tokens on this
-benchmark (Qwen3-32B, from `memory_thread_io_simple_summary`). It is per-cell —
+benchmark, measured on the paper's Qwen3-32B runs. It is per-cell —
 one square of the benchmark × baseline grid — not one global multiplier.
 
 The two arms are **separate runs of the same cell**; a config sets one or the
@@ -25,8 +25,8 @@ other, never both. Budgeting a run *and* sampling it k times would spend
 ## The numbers
 
 Both come from [`analysis/dr_vs_baseline_token_ratios.csv`](../../analysis/dr_vs_baseline_token_ratios.csv),
-the measured per-cell token ratios on Qwen3-32B. **Every cell has one, so all 28
-configs are ready to run** — nothing is gated any more.
+the measured per-cell token ratios on Qwen3-32B. Every cell has one, so all 28
+configs carry real numbers.
 
 `token_budget` is twice Deep Reasoner's own mean tokens per task on that
 benchmark (733,155 PhantomWiki · 88,421 SynthWorlds · 2,775,366 Oolong ·
@@ -41,12 +41,12 @@ from the measurement they cite.
 ## Prompts
 
 Each config inlines the **whole prompt** that cell runs with under
-`instructions:` — the benchmark instructions verbatim from `prompts.py`, plus the
-don't-give-up paragraph for `_try_hard`. `cat` the file and you see exactly what
-ran; a test asserts the inlined text still matches `prompts.py`.
+`instructions:` — the benchmark instructions verbatim from `src/prompts.py`, plus
+the don't-give-up paragraph for `_try_hard`. `cat` the file and you see exactly
+what ran; a test asserts the inlined text still matches `src/prompts.py`.
 
 The 6 runnable cells on **Oolong and DeepSearchQA carry no instructions, by
-design** — per the author's provenance table (reproduced in `prompts.py`), those
+design** — per the provenance table in `src/prompts.py`, those
 cells run on their framework's default prompt. That is a deliberate choice, not a
 gap, and the configs say which default they fall back to.
 
@@ -56,9 +56,16 @@ runs, which is the substantive prompt for that cell. **RLM configs carry the
 benchmark half only** — rlm's own `RLM_SYSTEM_PROMPT` still leads, exactly as it
 does without a config.
 
-## The unmatched baselines, for comparison
+## Running them
+
+See [reproduction.md §2](../../reproduction.md#2-token-matched-baseline-runs):
+`bash scripts/sbatch_runs.sh --configs 'configs/token_matched/*_try_hard.yaml'` (and
+`*_samplek.yaml`), then `python -m analysis.token_matched` per cell for majority@k,
+best@k and the budget report.
+
+## The paper's baseline runs
 
 `configs/baselines/<model>/<benchmark>_<baseline>.yaml` — 42 configs (the same 14
-cells × 3 models) mirroring the pre-token-matched runs: no budget, one attempt
-per task, default turn cap. Composed from `configs/base/` fragments via
-`_compose`, so each prompt is written once.
+cells × 3 models): the paper's baseline runs, on the same code path — no budget,
+one attempt per task, default turn cap. Composed from `configs/base/` fragments
+via `_compose`, so each prompt is written once.

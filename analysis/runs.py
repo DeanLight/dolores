@@ -58,8 +58,7 @@ def run_tree(cfg: dict) -> Path:
 
 
 # Deep Reasoner configs left out of the main table: SynthWorlds has two planner
-# versions (synthworlds.yaml = agent v01, synthworlds_v2.yaml = agent v02); the
-# table reports one of them.
+# versions, and the paper reports v1 (synthworlds.yaml), not v2 (synthworlds_v2.yaml).
 DR_EXCLUDE = ("synthworlds_v2",)
 
 

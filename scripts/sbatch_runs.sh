@@ -7,7 +7,7 @@
 #   bash scripts/sbatch_runs.sh --configs 'configs/baselines/qwen3_32b/*.yaml' [OPTIONS]
 #
 # Required:
-#   --configs GLOB         Quoted glob (or a single path) of configs to submit, e.g.
+#   --configs GLOB...      One or more config paths or quoted globs, e.g.
 #                            'configs/baselines/qwen3_32b/*.yaml'        paper baselines
 #                            'configs/token_matched/*_try_hard.yaml'     token matched
 #                            'configs/deep_reasoner/qwen3_32b/*.yaml'    Deep Reasoner
@@ -29,7 +29,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-CONFIGS_GLOB=""
+CONFIG_ARGS=()
 LIMIT=""
 MAX_WORKERS=""
 TOKEN_BUDGET=""
@@ -39,7 +39,9 @@ DRY_RUN=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --configs)       CONFIGS_GLOB="$2"; shift 2 ;;
+        --configs)
+            shift
+            while [[ $# -gt 0 && "$1" != --* ]]; do CONFIG_ARGS+=("$1"); shift; done ;;
         --limit)         LIMIT="$2";        shift 2 ;;
         --max-workers)   MAX_WORKERS="$2";  shift 2 ;;
         --token-budget)  TOKEN_BUDGET="$2"; shift 2 ;;
@@ -54,13 +56,16 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-: "${CONFIGS_GLOB:?--configs is required}"
-# shellcheck disable=SC2206  # deliberate glob expansion
-CONFIGS=($CONFIGS_GLOB)
-if [[ ${#CONFIGS[@]} -eq 0 || ! -f "${CONFIGS[0]}" ]]; then
-    echo "No configs match ${CONFIGS_GLOB}" >&2
-    exit 1
-fi
+[[ ${#CONFIG_ARGS[@]} -gt 0 ]] || { echo "--configs is required" >&2; exit 1; }
+CONFIGS=()
+for pattern in "${CONFIG_ARGS[@]}"; do
+    # shellcheck disable=SC2206  # deliberate glob expansion of quoted patterns
+    matches=($pattern)
+    for m in "${matches[@]}"; do
+        [[ -f "$m" ]] || { echo "No configs match ${pattern}" >&2; exit 1; }
+        CONFIGS+=("$m")
+    done
+done
 
 # ── resolve every config once: resources, sidecar fields, task counts ─────────
 # One TSV line per config. Task counts load the benchmark datasets; where that is

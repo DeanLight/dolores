@@ -2,7 +2,7 @@
 
 Core library for **DeepReasoner**: an iterative CodeAct-style agent with a Python REPL loop, `plan_exec` sub-agents, Jinja2-templated system prompts, and OpenAI-compatible chat backends.
 
-Benchmark CLIs and paper configs may live in a separate repo; this package is the runtime those workflows depend on.
+This package is vendored in the Dolores repository and installed with it (a uv workspace member). The paper's run configs, benchmarks and baselines live in the repository root; see [`../reproduction.md`](../reproduction.md). This package is the runtime Deep Reasoner runs on.
 
 ## Requirements
 
@@ -11,25 +11,11 @@ Benchmark CLIs and paper configs may live in a separate repo; this package is th
 
 ## Install
 
-From a checkout (editable):
+From the repository root, `uv sync` installs it together with Dolores (editable).
+On its own, from this directory:
 
 ```bash
-git clone https://github.com/SafeDesign-ai/symbolic-decomposer.git
-cd symbolic-decomposer
-uv sync
-# or: uv pip install -e .
-```
-
-Install a specific branch/revision from Git without cloning:
-
-```bash
-uv add "deep-reasoner @ git+https://github.com/SafeDesign-ai/symbolic-decomposer.git@branch-or-sha"
-```
-
-Traditional pip:
-
-```bash
-pip install "deep-reasoner @ git+https://github.com/SafeDesign-ai/symbolic-decomposer.git"
+uv sync            # or: uv pip install -e .
 ```
 
 Optional local GPU stack: `uv sync --extra vllm` (heavy). Dev tools: `uv sync --group dev`.
